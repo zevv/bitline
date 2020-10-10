@@ -5,3 +5,5 @@ make
 ./bitline < data/perf2
 ```
 
+![BitLine](/res/perf.png)
+
