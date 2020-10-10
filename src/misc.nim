@@ -67,7 +67,7 @@ type
     dragged*: int
     gui*: Gui
     isOpen*: HashSet[Group]
-    groupHeight*: Table[Group, int]
+    groupScale*: Table[Group, int]
     curGroup*: Group
     curEvent*: Event
     alpha*: float

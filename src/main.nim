@@ -26,17 +26,15 @@ const
 
 
 const helpText = """
-     a  zoom all
-     [  decrease alpha
-     ]  increase alpha
-     c  close
- shift  measure
-     =  increase font size
-     -  decrease font size
+     a       zoom all
+     c       close all
+     [ / ]   adjust alpha
+     + / -   adjust font size
+ shift       measure
 
-   LMB  drag: pan    click: open
-   RMB  drag: zoom   click: open & focus
-   MMM  drag: alpha
+   LMB       drag: pan    click: open
+   RMB       drag: zoom   click: open & focus
+   MMM       drag: row height
 """
 
 
@@ -324,9 +322,9 @@ proc pollSdl(app: App): bool =
     if e.kind == sdl.MouseWheel:
       let v = app.views[e.wheel.windowId]
       if v.curGroup != nil:
-        let h = v.groupHeight.mgetOrPut(v.curGroup, 0)
-        inc v.groupHeight[v.curGroup], e.wheel.y * 10
-        v.groupHeight[v.curGroup] = v.groupHeight[v.curGroup].clamp(0, 100)
+        let h = v.groupScale.mgetOrPut(v.curGroup, 0)
+        inc v.groupScale[v.curGroup], e.wheel.y
+        v.groupScale[v.curGroup] = v.groupScale[v.curGroup].clamp(0, 6)
 
     if e.kind == sdl.WindowEvent:
       let v = app.views[e.window.windowId]

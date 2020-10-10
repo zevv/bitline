@@ -270,6 +270,7 @@ proc drawData*(v: View) =
 
     let isOpen = g in v.isOpen
     let yGroup = y
+    let scale = 1 shl v.groupScale.getOrDefault(g, 0)
 
     # Draw label and events for this group
     var h = 0
@@ -277,7 +278,7 @@ proc drawData*(v: View) =
     c.a = uint8(255.0 / sqrt(depth.float))
     labels.add Label(x: depth*10, y: y, text: g.id, col: c)
     if g.events.len > 0:
-      h = v.rowSize + v.groupHeight.getOrDefault(g, 0)
+      h = v.rowSize * scale
       drawEvents(g, y, h)
 
     # Draw measurements for this group
@@ -293,8 +294,8 @@ proc drawData*(v: View) =
           let ts1 = g.events[0].ts.v1
           let ts2 = g.events[^1].ts.v2
           if ts1 < v.ts.v2 and (ts2 == NoTime or ts2 > v.ts.v1):
-            drawEvents(g, y, 1)
-            y += 1
+            drawEvents(g, y, scale)
+            y += scale
         for id, cg in g.groups:
           aux(cg)
       aux(g)
@@ -333,6 +334,7 @@ proc drawData*(v: View) =
     let tt = v.textCache.renderText(" " & l.text & " ", l.col)
     var r = Rect(x: l.x, y: l.y, w: tt.w, h: tt.h)
     v.setColor(col)
+    col.a = 200
     discard v.rend.renderFillRect(r.addr)
     discard v.rend.renderCopy(tt.tex, nil, r.addr)
 
