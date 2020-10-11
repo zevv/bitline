@@ -27,7 +27,7 @@ const
   colMeasure      = sdl.Color(r:255, g:255, b:128, a: 32)
   colKey          = sdl.Color(r:255, g:200, b:  0, a:128)
   colKeyOpen      = sdl.Color(r:255, g:200, b:  0, a:255)
-  colGroupSel     = sdl.Color(r:255, g:128, b:255, a: 15)
+  colGroupSel     = sdl.Color(r:255, g:255, b:255, a: 10)
   colStatusbar    = sdl.Color(r:255, g:255, b:255, a:128)
 
   colEvent        = sdl.Color(r:  0, g:255, b:173, a:150)
@@ -54,7 +54,6 @@ type
     groupScale: Table[Group, int]
     curGroup: Group
     curEvent: Event
-    alpha: float
     stats: ViewStats
     showGui: bool
     win: sdl.Window
@@ -331,9 +330,7 @@ proc drawData(v: View) =
     
     # Render all event rectangles
     if rects.len > 0:
-      var col = colEvent
-      col.a = uint8(v.alpha * 255)
-      v.setColor(col)
+      v.setColor(colEvent)
       discard v.rend.renderFillRects(rects[0].addr, rects.len)
     
     # Render graph events and lines
@@ -366,14 +363,14 @@ proc drawData(v: View) =
     # Draw label and events for this group
     var h = 0
     var c = if isOpen: colKeyOpen else: colKey
-    labels.add Label(x: depth*10, y: y, text: g.id, col: c)
+    labels.add Label(x: 0, y: y, text: repeat(" ", depth) & g.id & " ", col: c)
     if g.events.len > 0:
       h = v.rowSize * scale
       drawEvents(g, y + 1, h)
 
     # Draw measurements for this group
     if v.tMeasure != NoTime:
-      labels.add Label(x: v.mouse_x+2, y: y, text: v.measure(g), col: colEvent)
+      labels.add Label(x: v.mouse_x+2, y: y, text: v.measure(g) & " ", col: colEvent)
 
     y += h
 
@@ -422,7 +419,7 @@ proc drawData(v: View) =
   var col = colBg
   col.a = 240
   for l in labels:
-    let tt = v.textCache.renderText(" " & l.text & " ", l.col)
+    let tt = v.textCache.renderText(l.text, l.col)
     var r = Rect(x: l.x, y: l.y, w: tt.w, h: tt.h)
     v.setColor(col)
     col.a = 200
@@ -503,7 +500,6 @@ proc newView*(root: Group, w, h: int): View =
   v.lineSpacing = 3
   v.isOpen.incl root
   v.tMeasure = NoTime
-  v.alpha = 0.7
   v.cmdLine = CmdLine()
 
   return v
@@ -626,10 +622,6 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           inc v.rowSize
         of sdl.K_MINUS:
           dec v.rowSize
-        of sdl.K_LEFTBRACKET:
-          v.alpha = clamp(v.alpha * 0.8, 0.1, 1.0)
-        of sdl.K_RIGHTBRACKET:
-          v.alpha = clamp(v.alpha / 0.8, 0.1, 1.0)
         of sdl.K_LSHIFT:
           v.tMeasure = v.x2time(v.mouseX)
         of sdl.K_LALT:
@@ -682,10 +674,6 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         if v.dragButton == sdl.BUTTON_RIGHT:
           v.zoomX pow(1.01, dy.float)
           v.panX dx
-
-        if v.dragButton == sdl.BUTTON_MIDDLE:
-          v.alpha = (v.alpha * pow(1.01, dy.float)).clamp(0.1, 1.0)
-
 
     if e.kind == sdl.MouseButtonDown:
       let b = e.button.button
