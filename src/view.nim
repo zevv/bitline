@@ -562,7 +562,6 @@ proc draw*(v: View, appStats: AppStats) =
 
   discard v.rend.rendersetClipRect(nil)
 
-  v.textCache.setFontSize(v.rowSize)
   v.drawCursor()
   v.drawGui()
   v.drawStatusbar(appStats)
