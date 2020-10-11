@@ -267,7 +267,7 @@ proc drawData(v: View, root: Group) =
     var vMax = Value.low
 
     let pixelsPerValue = if g.vs.v1 != g.vs.v2: h.float / (g.vs.v2 - g.vs.v1) else: 0.0
-    proc v2y(v: float): int = y + h - int((v - g.vs.v1) * pixelsPerValue)
+    proc v2y(v: float): int = y + h - int((v - g.vs.v1) * pixelsPerValue).clamp(0, h)
 
     # Binary search for event indices which lie in the current view
     var i1 = g.events.lowerbound(v.ts.v1, (e, t) => cmp(if e.ts.v2 != NoTime: e.ts.v2 else: e.ts.v1, t))
@@ -304,9 +304,13 @@ proc drawData(v: View, root: Group) =
           rects.add Rect(x: x1, y: y, w: x2-x1, h: h)
         else:
           # Events with a value get graphed
-          let (y1, y2) = (vMax.v2y, vMin.v2y)
+          var (y0, y1, y2) = (0.v2y, vMax.v2y, vMin.v2y)
           points.add Point(x: x1, y: (y1+y2) div 2)
+
+          if y1 < y0 and y2 < y0: y1 = max(y1, y0)
+          if y1 > y0 and y2 > y0: y2 = min(y2, y0)
           graphRects.add Rect(x: x1, y: y1, w: x2-x1, h: y2-y1)
+
           vmin = Value.high
           vMax = Value.low
 
