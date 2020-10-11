@@ -1,6 +1,6 @@
 
 ```
-nimble install sdl2_nim chroma
+nimble install sdl2_nim
 make
 ./bitline < data/perf2
 ```

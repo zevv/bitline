@@ -3,12 +3,9 @@ import sets
 import strutils
 import os
 import gui
-import npeg
-import npeg
 import strformat
 import times except Time
 import hashes
-#import chroma
 import tables
 import math
 import textcache
