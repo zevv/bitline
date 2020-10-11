@@ -58,7 +58,7 @@ proc siFmt*(v: SomeNumber, unit="", align=false): string =
     fs.trimZeros()
     if align:
       fs = fs.align(5)
-    var sign = " "
+    var sign = ""
     if v < 0: sign = "-"
     &"{sign}{fs}{suffix}{unit}"
 

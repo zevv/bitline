@@ -193,6 +193,12 @@ proc pollSdl(app: App): bool =
 
     if e.kind == sdl.KeyDown:
       let v = app.views[e.key.windowId]
+      let key = e.key.keysym.sym
+      case key:
+        of sdl.K_a:
+          app.updateEvents(true)
+        else:
+          discard
       v.sdlEvent(e)
 
     if e.kind == sdl.KeyUp:

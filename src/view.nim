@@ -540,7 +540,6 @@ proc draw*(v: View, root: Group, appStats: AppStats) =
 
   let t1 = cpuTime()
 
-
   v.setColor colBg
   var r = Rect(x: 0, y: 0, w: v.w, h: v.h)
   discard v.rend.renderFillRect(r.addr)
@@ -548,7 +547,7 @@ proc draw*(v: View, root: Group, appStats: AppStats) =
   var rTop = Rect(x:0, y:0, w:v.w, h:v.rowSize + 2)
   var rBot = Rect(x:0, y:v.h - rTop.h, w:v.w, h:v.rowSize + 2)
   var rMain = Rect(x:0, y:rTop.h, w:v.w, h:v.h-rTop.h-rBot.h)
-  v.textCache.setFontSize(clamp(v.rowSize, 8, 14))
+  v.textCache.setFontSize(v.rowSize)
 
   discard v.rend.rendersetClipRect(addr rMain)
 
@@ -557,7 +556,7 @@ proc draw*(v: View, root: Group, appStats: AppStats) =
 
   discard v.rend.rendersetClipRect(nil)
 
-  v.textCache.setFontSize(clamp(v.rowSize, 8, 14))
+  v.textCache.setFontSize(v.rowSize)
   v.drawCursor()
   v.drawGui()
   v.drawStatusbar(appStats)
