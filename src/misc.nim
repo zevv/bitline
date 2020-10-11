@@ -35,17 +35,9 @@ type
     data*: string
     value*: Value
 
-  ViewStats* = object
-    renderTime*: float
-
   AppStats* = object
     eventCount*: int
     groupCount*: int
-
-  CmdLine* = ref object
-    active*: bool
-    s*: string
-    pos*: int
 
 const
   iso8601format* = "yyyy-MM-dd'T'HH:mm:ss'.'ffffff'Z'"

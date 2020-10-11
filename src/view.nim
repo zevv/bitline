@@ -28,9 +28,10 @@ const
   colKey          = sdl.Color(r:250, g:200, b:100, a:255)
   colEventSel     = sdl.Color(r:255, g:255, b:255, a: 30)
   colStatusbar    = sdl.Color(r:255, g:255, b:255, a:128)
-  colGraph        = sdl.Color(r:180, g:  0, b:255, a:255)
+  colGraph        = sdl.Color(r:  0, g:255, b:173, a:150)
 
 type
+
   View* = ref object
     ts: TimeSpan
     pixelsPerSecond: float
@@ -55,6 +56,14 @@ type
     rend: sdl.Renderer
     textCache: TextCache
     cmdLine: CmdLine
+  
+  CmdLine = ref object
+    active: bool
+    s: string
+    pos: int
+
+  ViewStats = object
+    renderTime: float
 
 
 # Helpers
@@ -259,8 +268,8 @@ proc drawData(v: View, root: Group) =
         # Never overlap over previous events
         x1 = max(x1, xprev)
 
-        # Graph events with a value
         if e.value != NoValue:
+          # Events with a value get graphed
           let y2 = y + h - int(h.float * (e.value - g.vs.v1) / (g.vs.v2 - g.vs.v1))
           points.add Point(x: x1, y: y2)
         else:
@@ -287,6 +296,7 @@ proc drawData(v: View, root: Group) =
       col.a = uint8(v.alpha * 255)
       v.setColor(col)
       discard v.rend.renderFillRects(rects[0].addr, rects.len)
+      #discard v.rend.renderDrawRects(rects[0].addr, rects.len)
 
     # Render all graph lines
     if points.len > 0:
@@ -417,6 +427,7 @@ proc drawGui(v: View) =
 
 
 proc update(v: View) =
+  v.rowSize = v.rowSize.clamp(4, 128)
   v.pixelsPerSecond = v.w.float / (v.ts.v2 - v.ts.v1)
 
 
@@ -484,7 +495,6 @@ proc draw*(v: View, root: Group, appStats: AppStats) =
 
   let t1 = cpuTime()
 
-  v.rowSize = v.rowSize.clamp(4, 128)
 
   v.setColor colBg
   var r = Rect(x: 0, y: 0, w: v.w, h: v.h)
