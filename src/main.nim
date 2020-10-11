@@ -6,7 +6,7 @@ import gui
 import npeg
 import npeg
 import strformat
-import times
+import times except Time
 import hashes
 #import chroma
 import tables
@@ -49,7 +49,7 @@ const helpText = """
 
 
 
-proc addEvent(app: App, t: TimeFloat, key, ev, evdata: string) =
+proc addEvent(app: App, t: Time, key, ev, evdata: string) =
 
   var g: Group
   if key in app.gidCache:
@@ -94,7 +94,7 @@ proc updateEvents(app: App, updateViews=false) =
     inc app.stats.groupCount
     inc app.stats.eventCount, g.events.len
 
-    g.ts = initSpan(TimeFloat.high, TimeFloat.low)
+    g.ts = initSpan(Time.high, Time.low)
     g.vs = initSpan(Value.high, Value.low)
 
     if g.events.len > 0:

@@ -14,12 +14,12 @@ type
 
   Value* = float64
 
-  TimeFloat* = float64
+  Time* = float64
 
   Span*[T] = object
     v1*, v2*: T
 
-  TimeSpan* = Span[TimeFloat]
+  TimeSpan* = Span[Time]
 
   ValueSpan* = Span[Value]
 
@@ -100,7 +100,7 @@ proc contains*[T](s: Span[T], v: T): bool =
   v >= s.v1 and v <= s.v2
 
 
-proc fmtDuration*(d: TimeFloat): string =
+proc fmtDuration*(d: Time): string =
   let d = abs(d)
   result.add if d < 60:
     siFmt(d, "s")

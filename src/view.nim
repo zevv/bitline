@@ -9,7 +9,7 @@ import os
 import npeg
 import npeg
 import strformat
-import times
+import times except Time
 import hashes
 #import chroma
 import tables
@@ -35,7 +35,7 @@ type
   View* = ref object
     ts: TimeSpan
     pixelsPerSecond: float
-    tMeasure: TimeFloat
+    tMeasure: Time
     ytop: int
     rowSize: int
     lineSpacing: float
@@ -68,10 +68,10 @@ type
 
 # Helpers
 
-proc time2x(v: View, t: TimeFloat): int =
+proc time2x(v: View, t: Time): int =
   result = int((t - v.ts.v1) * v.pixelsPerSecond)
 
-proc x2time(v: View, x: int): TimeFloat =
+proc x2time(v: View, x: int): Time =
   v.ts.v1 + (x / v.w) * (v.ts.v2 - v.ts.v1)
 
 
@@ -482,7 +482,7 @@ proc panX*(v: View, dx: int) =
 proc getWindow*(v: View): Window =
   v.win
  
-proc setTMeasure*(v: View, t: TimeFloat) =
+proc setTMeasure*(v: View, t: Time) =
   v.tMeasure = t
 
 proc draw*(v: View, root: Group, appStats: AppStats) =
