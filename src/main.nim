@@ -257,6 +257,9 @@ proc newApp*(w, h: int): App =
 
   let v = newView(app.root, w, h)
   app.views[sdl.getWindowId(v.getWindow())] = v
+  
+  let v = newView(app.root, w, h)
+  app.views[sdl.getWindowId(v.getWindow())] = v
 
   discard app.readEvents()
   app.updateEvents(true)
