@@ -77,6 +77,29 @@ proc time2x(v: View, t: Time): int =
 proc x2time(v: View, x: int): Time =
   v.ts.v1 + (x / v.w) * (v.ts.v2 - v.ts.v1)
 
+proc hsv2color(h, s, v: float): Color =
+
+  var h = h * 6.0
+  var i = (int)floor(h)
+  var f = (h) - i.float
+  if (i and 1) == 0:
+    f = 1 - f
+  var m = v * (1 - s)
+  var n = v * (1 - s * f)
+  i = i mod 6
+
+  return case i
+    of 6,0: Color(r:uint8(v*255), g:uint8(n*255), b:uint8(m*255), a:255)
+    of 1:   Color(r:uint8(n*255), g:uint8(v*255), b:uint8(m*255), a:255)
+    of 2:   Color(r:uint8(m*255), g:uint8(v*255), b:uint8(n*255), a:255)
+    of 3:   Color(r:uint8(m*255), g:uint8(n*255), b:uint8(v*255), a:255)
+    of 4:   Color(r:uint8(n*255), g:uint8(m*255), b:uint8(v*255), a:255)
+    of 5:   Color(r:uint8(v*255), g:uint8(m*255), b:uint8(n*255), a:255)
+    else:   Color(r:uint8(255),   g:uint8(255)  , b:uint8(255)  , a:255)
+
+proc color(g: Group): Color =
+  let hue = g.bin.float / 9.0 + 0.5
+  hsv2color(hue, 0.8, 1.0)
 
 
 # Drawing primitives
@@ -327,20 +350,23 @@ proc drawData(v: View) =
         # not go unnoticed, on any zoom level
         xprev = x2 + 1
 
-    
+    var col = g.color
+    v.setColor(col)
+
     # Render all event rectangles
     if rects.len > 0:
-      v.setColor(colEvent)
       discard v.rend.renderFillRects(rects[0].addr, rects.len)
     
     # Render graph events and lines
+ 
+    if points.len > 0:
+      discard v.rend.renderDrawLines(points[0].addr, points.len)
+
     if graphRects.len > 0:
-      v.setColor(colGraphEvent)
+      col.a = 64
+      v.setColor(col)
       discard v.rend.renderFillRects(graphRects[0].addr, graphRects.len)
 
-    if points.len > 0:
-      v.setColor(colGraphLine)
-      discard v.rend.renderDrawLines(points[0].addr, points.len)
 
 
   # Draw groups
@@ -362,7 +388,8 @@ proc drawData(v: View) =
 
     # Draw label and events for this group
     var h = 0
-    var c = if isOpen: colKeyOpen else: colKey
+    #var c = if isOpen: colKeyOpen else: colKey
+    var c = g.color()
     labels.add Label(x: 0, y: y, text: repeat(" ", depth) & g.id & " ", col: c)
     if g.events.len > 0:
       h = v.rowSize * scale
@@ -579,6 +606,12 @@ proc handleCmd(v: View, s: string) =
     discard aux(v.root)
 
 
+proc setBin(g: Group, bin: Bin) =
+  proc aux(g: Group) =
+    g.bin = bin
+    for _, cg in g.groups:
+      aux(cg)
+  aux(g)
 
 proc sdlEvent*(v: View, e: sdl.Event) =
 
@@ -630,6 +663,9 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.yTop = 0
         of sdl.K_c:
           v.closeAll()
+        of sdl.K_1..sdl.K_9:
+          if v.curGroup != nil:
+            v.curGroup.setBin (key.int - sdl.K_1.int)
         of sdl.K_COMMA:
             v.zoomX 1.0/0.9
         of sdl.K_PERIOD:

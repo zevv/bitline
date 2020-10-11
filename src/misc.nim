@@ -23,12 +23,15 @@ type
 
   ValueSpan* = Span[Value]
 
+  Bin* = range[0..8]
+
   Group* = ref object
     id*: string
     ts*: TimeSpan
     vs*: ValueSpan
     groups*: OrderedTable[string, Group]
     events*: seq[Event]
+    bin*: Bin
 
   Event* = object
     ts*: TimeSpan

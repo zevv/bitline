@@ -40,9 +40,11 @@ proc addEvent(app: App, t: Time, key, ev, evdata: string) =
     g = app.gidCache[key]
   else:
     g = app.root
+    var bin = -1
     for id in key.split("."):
+      if bin == -1: bin = hash(id) mod 10
       if id notin g.groups:
-        g.groups[id] = Group(id: id)
+        g.groups[id] = Group(id: id, bin: bin)
       g = g.groups[id]
     app.gidCache[key] = g
 
