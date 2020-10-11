@@ -35,12 +35,6 @@ type
     data*: string
     value*: Value
 
-  MouseButton* = enum
-    ButtonNone = 0,
-    ButtonLeft,
-    ButtonMiddle,
-    ButtonRight,
-
   ViewStats* = object
     renderTime*: float
 
@@ -52,40 +46,6 @@ type
     active*: bool
     s*: string
     pos*: int
-
-  View* = ref object
-    app*: App
-    ts*: TimeSpan
-    pixelsPerSecond*: float
-    tMeasure*: TimeFloat
-    ytop*: int
-    rowSize*: int
-    lineSpacing*: float
-    w*, h*: int
-    mouseX*, mouseY*: int
-    dragX*, dragY*: int
-    dragButton*: MouseButton
-    dragged*: int
-    gui*: Gui
-    isOpen*: HashSet[Group]
-    groupScale*: Table[Group, int]
-    curGroup*: Group
-    curEvent*: Event
-    alpha*: float
-    stats*: ViewStats
-    showGui*: bool
-    win*: sdl.Window
-    rend*: sdl.Renderer
-    textCache*: TextCache
-    cmdLine*: CmdLine
-
-  App* = ref object
-    root*: Group
-    views*: Table[uint32, View]
-    gidCache*: Table[string, Group]
-    rxBuf*: string
-    rxPtr*: int
-    stats*: AppStats
 
 const
   iso8601format* = "yyyy-MM-dd'T'HH:mm:ss'.'ffffff'Z'"

@@ -20,6 +20,15 @@ import misc
 import view
 
 
+type
+  App* = ref object
+    root*: Group
+    views*: Table[uint32, View]
+    gidCache*: Table[string, Group]
+    rxBuf*: string
+    rxPtr*: int
+    stats*: AppStats
+
 
 const
   readBufSize = 256 * 1024
@@ -72,7 +81,7 @@ proc addEvent(app: App, t: TimeFloat, key, ev, evdata: string) =
 
 
 
-proc updateEvents(app: App, updateView=false) =
+proc updateEvents(app: App, updateViews=false) =
 
   app.stats.groupCount = 0
   app.stats.eventCount = 0
@@ -105,8 +114,7 @@ proc updateEvents(app: App, updateView=false) =
   let ts = aux(app.root)
 
   for _, v in app.views:
-    if updateView or v.ts.v1 == NoTime:
-      v.ts = ts
+    v.setSpan(ts, updateViews)
 
 
 proc parseEvent(app: App, l: string) =
@@ -180,157 +188,37 @@ proc pollSdl(app: App): bool =
       quit 0
 
     if e.kind == sdl.TextInput:
-      let
-        v = app.views[e.key.windowId]
-        c = v.cmdLine
-      if c.active:
-        var i = 0
-        while e.text.text[i] != '\0':
-          c.s.add $e.text.text[i]
-          inc i
+      let v = app.views[e.key.windowId]
+      v.sdlEvent(e)
 
     if e.kind == sdl.KeyDown:
-      let
-        v = app.views[e.key.windowId]
-        key = e.key.keysym.sym
-        c = v.cmdLine
-      echo key.repr
-
-      if c.active:
-        case key
-        of sdl.K_RETURN:
-          c.active = false
-        of sdl.K_ESCAPE:
-          c.active = false
-        of sdl.K_BACKSPACE:
-          if c.s.len > 0:
-            c.s = c.s[0..^2]
-        else:
-          discard
-
-      else:
-
-        case key
-        of sdl.K_ESCAPE, sdl.K_Q:
-          quit(0)
-        of sdl.K_SEMICOLON:
-          c.active = true
-        of sdl.K_EQUALS:
-          inc v.rowSize
-        of sdl.K_MINUS:
-          dec v.rowSize
-        of sdl.K_LEFTBRACKET:
-          v.alpha = clamp(v.alpha * 0.8, 0.1, 1.0)
-        of sdl.K_RIGHTBRACKET:
-          v.alpha = clamp(v.alpha / 0.8, 0.1, 1.0)
-        of sdl.K_LSHIFT:
-          v.tMeasure = v.x2time(v.mouseX)
-        of sdl.K_LALT:
-          v.showGui = true
-        of sdl.K_a:
-          app.updateEvents(true)
-          v.yTop = 0
-        of sdl.K_c:
-          v.isOpen.clear
-        of sdl.K_COMMA:
-            v.zoomX 1.0/0.9
-        of sdl.K_PERIOD:
-            v.zoomX 0.9
-        of sdl.K_LEFT:
-            v.panX -50
-        of sdl.K_RIGHT:
-            v.panX 50
-        of sdl.K_h:
-          discard sdl.showSimpleMessageBox(0, "help", helpText, v.win);
-        else:
-          discard
+      let v = app.views[e.key.windowId]
+      v.sdlEvent(e)
 
     if e.kind == sdl.KeyUp:
-      let key = e.key.keysym.sym
       let v = app.views[e.key.windowId]
-      case key
-      of sdl.K_LSHIFT:
-        v.tMeasure = NoTime
-      of sdl.K_LALT:
-        v.showGui = false
-      else:
-        discard
+      v.sdlEvent(e)
 
     if e.kind == sdl.MouseMotion:
       let v = app.views[e.motion.windowId]
-      v.gui.mouseMove e.motion.x, e.motion.y
-      v.mouseX = e.motion.x
-      v.mouseY = e.motion.y
-      let dx = v.dragX - v.mouseX
-      let dy = v.dragY - v.mouseY
-      v.dragX = e.button.x
-      v.dragY = e.button.y
-
-      if not v.gui.isActive():
-
-        if v.dragButton != ButtonNone:
-          inc v.dragged, abs(dx) + abs(dy)
-
-        if v.dragButton == ButtonLeft:
-          v.yTop -= dy
-          v.panX dx
-
-        if v.dragButton == ButtonRight:
-          v.zoomX pow(1.01, dy.float)
-          v.panX dx
-
-        if v.dragButton == ButtonMiddle:
-          v.alpha = (v.alpha * pow(1.01, dy.float)).clamp(0.1, 1.0)
-
+      v.sdlEvent(e)
 
     if e.kind == sdl.MouseButtonDown:
-      let b = e.button.button.MouseButton
       let v = app.views[e.button.windowId]
-      v.gui.mouseButton e.button.x, e.button.y, 1
-      v.dragButton = b
-      v.dragged = 0
-
-      if b == ButtonMiddle:
-        v.tMeasure = v.x2time(e.button.x)
+      v.sdlEvent(e)
 
     if e.kind == sdl.MouseButtonUp:
-      let b = e.button.button.MouseButton
-
       for id, v in app.views:
         if e.button.windowId == 0 or e.button.windowID == id:
-          v.gui.mouseButton e.button.x, e.button.y, 0
-          v.dragButton = ButtonNone
-          if v.dragged < 3:
-
-            if b == ButtonLeft:
-              if v.curGroup != nil:
-                if v.curGroup in v.isOpen:
-                  v.isOpen.excl v.curGroup
-                else:
-                  v.isOpen.incl v.curGroup
-
-            if b == ButtonRight:
-              if v.curGroup != nil:
-                v.isOpen.incl v.curGroup
-                let dt = v.curGroup.ts.v2 - v.curGroup.ts.v1
-                v.ts.v1 = v.curGroup.ts.v1 - (dt / 5)
-                v.ts.v2 = v.curGroup.ts.v2 + (dt / 20)
-    
-          if b == ButtonMiddle:
-            v.tMeasure = NoTime
+          v.sdlEvent(e)
 
     if e.kind == sdl.MouseWheel:
       let v = app.views[e.wheel.windowId]
-      if v.curGroup != nil:
-        let h = v.groupScale.mgetOrPut(v.curGroup, 0)
-        inc v.groupScale[v.curGroup], e.wheel.y
-        v.groupScale[v.curGroup] = v.groupScale[v.curGroup].clamp(0, 6)
+      v.sdlEvent(e)
 
     if e.kind == sdl.WindowEvent:
       let v = app.views[e.window.windowId]
-      if e.window.event == sdl.WINDOWEVENT_RESIZED:
-        v.w = e.window.data1
-        v.h = e.window.data2
+      v.sdlEvent(e)
 
 
 
@@ -345,7 +233,7 @@ proc run*(app: App): bool =
 
     if redraw > 0:
       for _, v in app.views:
-        v.draw()
+        v.draw(app.root, app.stats)
       dec redraw
 
     let t1 = cpuTime()
@@ -367,7 +255,8 @@ proc newApp*(w, h: int): App =
   app.root = Group(id: "/")
   app.rxBuf = newString(readBufSize)
 
-  app.newView(w, h)
+  let v = newView(app.root, w, h)
+  app.views[sdl.getWindowId(v.getWindow())] = v
 
   discard app.readEvents()
   app.updateEvents(true)

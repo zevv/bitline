@@ -1,6 +1,6 @@
 
+import sdl2/sdl except Event
 import sdl2/sdl_ttf as ttf
-import sdl2/sdl
 import sets
 import algorithm
 import sugar
@@ -30,13 +30,41 @@ const
   colStatusbar    = sdl.Color(r:255, g:255, b:255, a:128)
   colGraph        = sdl.Color(r:180, g:  0, b:255, a:255)
 
+type
+  View* = ref object
+    ts: TimeSpan
+    pixelsPerSecond: float
+    tMeasure: TimeFloat
+    ytop: int
+    rowSize: int
+    lineSpacing: float
+    w, h: int
+    mouseX, mouseY: int
+    dragX, dragY: int
+    dragButton: int
+    dragged: int
+    gui: Gui
+    isOpen: HashSet[Group]
+    groupScale: Table[Group, int]
+    curGroup: Group
+    curEvent: Event
+    alpha: float
+    stats: ViewStats
+    showGui: bool
+    win: sdl.Window
+    rend: sdl.Renderer
+    textCache: TextCache
+    cmdLine: CmdLine
+
+
 # Helpers
 
-proc time2x*(v: View, t: TimeFloat): int =
+proc time2x(v: View, t: TimeFloat): int =
   result = int((t - v.ts.v1) * v.pixelsPerSecond)
 
-proc x2time*(v: View, x: int): TimeFloat =
+proc x2time(v: View, x: int): TimeFloat =
   v.ts.v1 + (x / v.w) * (v.ts.v2 - v.ts.v1)
+
 
 
 # Drawing primitives
@@ -64,7 +92,7 @@ proc drawText(v: View, x, y: int, text: string, col: sdl.Color, align=AlignLeft)
 
 # Draw UI components
 
-proc drawGrid*(v: View) =
+proc drawGrid(v: View) =
 
   let
     y1 = v.rowSize + 2
@@ -114,7 +142,7 @@ proc drawGrid*(v: View) =
   aux(initDateTime(year=1970, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()), 365*24*3600.0, "yyyy", "MMM")
 
 
-proc drawCursor*(v: View) =
+proc drawCursor(v: View) =
   let
     x = v.mouseX
     t = v.x2time(x)
@@ -189,9 +217,8 @@ proc measure(v: View, group: Group): string =
   result.add parts.join(" / ")
 
 
-proc drawData*(v: View) =
+proc drawData(v: View, root: Group) =
 
-  let app = v.app
   v.curGroup = nil
   v.curEvent.ts.v1 = NoTime
 
@@ -255,14 +282,16 @@ proc drawData*(v: View) =
 
     
     # Render all event rectangles
-    var col = colEvent
-    col.a = uint8(v.alpha * 255)
-    v.setColor(col)
-    discard v.rend.renderFillRects(rects[0].addr, rects.len)
+    if rects.len > 0:
+      var col = colEvent
+      col.a = uint8(v.alpha * 255)
+      v.setColor(col)
+      discard v.rend.renderFillRects(rects[0].addr, rects.len)
 
     # Render all graph lines
-    v.setColor(colGraph)
-    discard v.rend.renderDrawLines(points[0].addr, points.len)
+    if points.len > 0:
+      v.setColor(colGraph)
+      discard v.rend.renderDrawLines(points[0].addr, points.len)
 
 
   # Draw groups
@@ -318,7 +347,7 @@ proc drawData*(v: View) =
 
   # Recursively draw all groups
 
-  drawGroup(app.root, 0)
+  drawGroup(root, 0)
 
   # Draw evdata for current event
 
@@ -343,10 +372,9 @@ proc drawData*(v: View) =
 
 
 
-proc drawStatusbar*(v: View) =
+proc drawStatusbar(v: View, aps: AppStats) =
 
   let
-    app = v.app
     c = v.cmdLine
   var text: string
 
@@ -356,7 +384,6 @@ proc drawStatusbar*(v: View) =
   else:
 
     let
-      aps = app.stats
       vws = v.stats
 
     text =
@@ -376,7 +403,7 @@ proc drawStatusbar*(v: View) =
 
 
 
-proc drawGui*(v: View) =
+proc drawGui(v: View) =
 
   if not v.showGui:
     return
@@ -393,7 +420,61 @@ proc update(v: View) =
   v.pixelsPerSecond = v.w.float / (v.ts.v2 - v.ts.v1)
 
 
-proc draw*(v: View) =
+
+proc newView*(root: Group, w, h: int): View =
+  let v = View()
+
+  v.win = createWindow("events",
+    WindowPosUndefined, WindowPosUndefined,
+    w, h, WINDOW_RESIZABLE)
+
+  v.rend = createRenderer(v.win, -1, sdl.RendererAccelerated and sdl.RendererPresentVsync)
+  v.textCache = newTextCache(v.rend, "font.ttf")
+
+  discard v.rend.setRenderDrawBlendMode(BLENDMODE_BLEND)
+
+  v.w = w
+  v.h = h
+  v.gui = newGui(v.rend, v.textcache)
+  v.ts.v1 = getTime().toUnixFloat
+  v.ts.v2 = v.ts.v1 + 60.0
+  v.rowSize = 12
+  v.lineSpacing = 3
+  v.isOpen.incl root
+  v.tMeasure = NoTime
+  v.alpha = 0.7
+  v.cmdLine = CmdLine()
+
+  return v
+
+
+proc closeAll*(v: View) =
+  v.isOpen.clear
+
+proc setSpan*(v: View, ts: TimeSpan, force=false) =
+  if force or v.ts.v1 == NoTime:
+    v.ts = ts
+
+proc zoomX*(v: View, f: float) =
+  let tm = v.x2time(v.mouseX)
+  v.ts.v1 = tm - (tm - v.ts.v1) * f
+  v.ts.v2 = tm + (v.ts.v2 - tm) * f
+
+proc panY*(v: View, dy: int) =
+  v.yTop -= dy
+
+proc panX*(v: View, dx: int) =
+  let dt = (v.ts.v2 - v.ts.v1) / v.w.float * dx.float
+  v.ts.v1 = v.ts.v1 + dt
+  v.ts.v2 = v.ts.v2 + dt
+
+proc getWindow*(v: View): Window =
+  v.win
+ 
+proc setTMeasure*(v: View, t: TimeFloat) =
+  v.tMeasure = t
+
+proc draw*(v: View, root: Group, appStats: AppStats) =
 
   if v.ts.v2 == NoTime:
     echo "no time"
@@ -417,62 +498,162 @@ proc draw*(v: View) =
   discard v.rend.rendersetClipRect(addr rMain)
 
   v.drawGrid()
-  v.drawData()
+  v.drawData(root)
 
   discard v.rend.rendersetClipRect(nil)
 
   v.textCache.setFontSize(clamp(v.rowSize, 8, 14))
   v.drawCursor()
   v.drawGui()
-  v.drawStatusbar()
+  v.drawStatusbar(appStats)
 
   v.rend.renderPresent
 
   v.stats.renderTime = cpuTime() - t1
 
 
-proc zoomX*(v: View, f: float) =
-  let tm = v.x2time(v.mouseX)
-  v.ts.v1 = tm - (tm - v.ts.v1) * f
-  v.ts.v2 = tm + (v.ts.v2 - tm) * f
+proc sdlEvent*(v: View, e: sdl.Event) =
 
-proc panX*(v: View, dx: int) =
-  let dt = (v.ts.v2 - v.ts.v1) / v.w.float * dx.float
-  v.ts.v1 = v.ts.v1 + dt
-  v.ts.v2 = v.ts.v2 + dt
+    if e.kind == sdl.TextInput:
+      let
+        c = v.cmdLine
+      if c.active:
+        var i = 0
+        while e.text.text[i] != '\0':
+          c.s.add $e.text.text[i]
+          inc i
+
+    if e.kind == sdl.KeyDown:
+      let
+        key = e.key.keysym.sym
+        c = v.cmdLine
+      echo key.repr
+
+      if c.active:
+        case key
+        of sdl.K_RETURN:
+          c.active = false
+        of sdl.K_ESCAPE:
+          c.active = false
+        of sdl.K_BACKSPACE:
+          if c.s.len > 0:
+            c.s = c.s[0..^2]
+        else:
+          discard
+
+      when true:
+
+        case key
+        of sdl.K_ESCAPE, sdl.K_Q:
+          quit(0)
+        of sdl.K_SEMICOLON:
+          c.active = true
+        of sdl.K_EQUALS:
+          inc v.rowSize
+        of sdl.K_MINUS:
+          dec v.rowSize
+        of sdl.K_LEFTBRACKET:
+          v.alpha = clamp(v.alpha * 0.8, 0.1, 1.0)
+        of sdl.K_RIGHTBRACKET:
+          v.alpha = clamp(v.alpha / 0.8, 0.1, 1.0)
+        of sdl.K_LSHIFT:
+          v.tMeasure = v.x2time(v.mouseX)
+        of sdl.K_LALT:
+          v.showGui = true
+        of sdl.K_c:
+          v.closeAll()
+        of sdl.K_COMMA:
+            v.zoomX 1.0/0.9
+        of sdl.K_PERIOD:
+            v.zoomX 0.9
+        of sdl.K_LEFT:
+            v.panX -50
+        of sdl.K_RIGHT:
+            v.panX 50
+        #of sdl.K_h:
+        #  discard sdl.showSimpleMessageBox(0, "help", helpText, v.getWindow());
+        else:
+          discard
+
+    if e.kind == sdl.KeyUp:
+      let key = e.key.keysym.sym
+      case key
+      of sdl.K_LSHIFT:
+        v.tMeasure = NoTime
+      of sdl.K_LALT:
+        v.showGui = false
+      else:
+        discard
+
+    if e.kind == sdl.MouseMotion:
+      v.gui.mouseMove e.motion.x, e.motion.y
+      v.mouseX = e.motion.x
+      v.mouseY = e.motion.y
+      let dx = v.dragX - v.mouseX
+      let dy = v.dragY - v.mouseY
+      v.dragX = e.button.x
+      v.dragY = e.button.y
+
+      if not v.gui.isActive():
+
+        if v.dragButton != 0:
+          inc v.dragged, abs(dx) + abs(dy)
+
+        if v.dragButton == sdl.BUTTON_Left:
+          v.panY dy
+          v.panX dx
+
+        if v.dragButton == sdl.BUTTON_RIGHT:
+          v.zoomX pow(1.01, dy.float)
+          v.panX dx
+
+        if v.dragButton == sdl.BUTTON_MIDDLE:
+          v.alpha = (v.alpha * pow(1.01, dy.float)).clamp(0.1, 1.0)
 
 
+    if e.kind == sdl.MouseButtonDown:
+      let b = e.button.button
+      v.gui.mouseButton e.button.x, e.button.y, 1
+      v.dragButton = b
+      v.dragged = 0
 
+      if b == sdl.BUTTON_MIDDLE:
+        v.tMeasure = v.x2time(e.button.x)
 
-proc newView*(app: App, w, h: int) =
-  let v = View()
+    if e.kind == sdl.MouseButtonUp:
+      let b = e.button.button
 
-  v.app = app
+      v.gui.mouseButton e.button.x, e.button.y, 0
+      v.dragButton = 0
+      if v.dragged < 3:
 
-  v.win = createWindow("events",
-    WindowPosUndefined, WindowPosUndefined,
-    w, h, WINDOW_RESIZABLE)
+        if b == sdl.BUTTON_Left:
+          if v.curGroup != nil:
+            if v.curGroup in v.isOpen:
+              v.isOpen.excl v.curGroup
+            else:
+              v.isOpen.incl v.curGroup
 
-  v.rend = createRenderer(v.win, -1, sdl.RendererAccelerated and sdl.RendererPresentVsync)
-  v.textCache = newTextCache(v.rend, "font.ttf")
+        if b == sdl.BUTTON_RIGHT:
+          if v.curGroup != nil:
+            v.isOpen.incl v.curGroup
+            let dt = v.curGroup.ts.v2 - v.curGroup.ts.v1
+            v.ts.v1 = v.curGroup.ts.v1 - (dt / 5)
+            v.ts.v2 = v.curGroup.ts.v2 + (dt / 20)
+  
+        if b == sdl.BUTTON_MIDDLE:
+          v.tMeasure = NoTime
 
-  discard v.rend.setRenderDrawBlendMode(BLENDMODE_BLEND)
+    if e.kind == sdl.MouseWheel:
+      if v.curGroup != nil:
+        let h = v.groupScale.mgetOrPut(v.curGroup, 0)
+        inc v.groupScale[v.curGroup], e.wheel.y
+        v.groupScale[v.curGroup] = v.groupScale[v.curGroup].clamp(0, 6)
 
-  v.w = w
-  v.h = h
-  v.gui = newGui(v.rend, v.textcache)
-  v.ts.v1 = getTime().toUnixFloat
-  v.ts.v2 = v.ts.v1 + 60.0
-  v.rowSize = 12
-  v.lineSpacing = 3
-  v.isOpen.incl app.root
-  v.tMeasure = NoTime
-  v.alpha = 0.7
-  v.cmdLine = CmdLine()
-
-  app.views[v.win.getWindowId()] = v
-
+    if e.kind == sdl.WindowEvent:
+      if e.window.event == sdl.WINDOWEVENT_RESIZED:
+        v.w = e.window.data1
+        v.h = e.window.data2
 
 
 # vi: ft=nim sw=2 ts=2
-
