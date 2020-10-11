@@ -33,10 +33,10 @@ const
 # Helpers
 
 proc time2x*(v: View, t: TimeFloat): int =
-  result = int(v.w.float * (t - v.ts.v1) / (v.ts.v2 - v.ts.v1))
+  result = int((t - v.ts.v1) * v.pixelsPerSecond)
 
 proc x2time*(v: View, x: int): TimeFloat =
-  v.ts.v1 + (x / v.w) * (v.ts.v2-v.ts.v1)
+  v.ts.v1 + (x / v.w) * (v.ts.v2 - v.ts.v1)
 
 
 # Drawing primitives
@@ -215,6 +215,7 @@ proc drawData*(v: View) =
     var i1 = g.events.lowerbound(v.ts.v1, (e, t) => cmp(if e.ts.v2 != NoTime: e.ts.v2 else: e.ts.v1, t))
     var i2 = g.events.upperbound(v.ts.v2, (e, t) => cmp(e.ts.v1, t))
 
+    # Iterate visible events
     for i in i1 ..< i2:
 
       let e = g.events[i]
@@ -224,9 +225,8 @@ proc drawData*(v: View) =
         else:
           max(v.time2x(e.ts.v2), x1+1)
 
-      # Only draw this event if it is at least 1 pixel away from the last drawn
-      # event. This is a huge optimization because we will never need to draw
-      # more then view.w events per group
+      # Only draw this event if it gets drawn on a different pixel then the
+      # previous event
       if x2 > xprev:
 
         # Never overlap over previous events
@@ -244,14 +244,15 @@ proc drawData*(v: View) =
         if e.ts.v2 == NoTime:
           for i in 1..<h /% 2:
             rects.add Rect(x: x1+i, y: y+i, w: 1, h: h-i*2)
+        
+        # Check for hovering
+        if initSpan(y, y+h).contains(v.mouseY) and initSpan(x1, x2).contains(v.mouseX):
+          v.curEvent = e
 
         # Always leave a gap of 1 pixel between event, this makese sure gaps do
         # not go unnoticed, on any zoom level
         xprev = x2 + 1
 
-      # Check for hovering
-      if initSpan(y, y+h).contains(v.mouseY) and initSpan(x1, x2).contains(v.mouseX):
-        v.curEvent = e
     
     # Render all event rectangles
     var col = colEvent
@@ -388,6 +389,9 @@ proc drawGui*(v: View) =
   v.gui.stop()
 
 
+proc update(v: View) =
+  v.pixelsPerSecond = v.w.float / (v.ts.v2 - v.ts.v1)
+
 
 proc draw*(v: View) =
 
@@ -395,6 +399,7 @@ proc draw*(v: View) =
     echo "no time"
     return
 
+  v.update()
 
   let t1 = cpuTime()
 

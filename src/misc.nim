@@ -56,6 +56,7 @@ type
   View* = ref object
     app*: App
     ts*: TimeSpan
+    pixelsPerSecond*: float
     tMeasure*: TimeFloat
     ytop*: int
     rowSize*: int

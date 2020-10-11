@@ -12,7 +12,7 @@ proc pow2(t1, t2: float, depth: int) =
     echo t+dt, " pow2.", depth, " -"
     t += dt*2
 
-  if depth < 16:
+  if depth < 21:
     pow2(t1, t2, depth+1)
 
 
@@ -49,6 +49,6 @@ proc graphs(t1, t2: float, depth: int) =
 
 
 
-pow2(100, 200, 1)
 noise(100, 200, 1)
 graphs(100, 200, 1)
+pow2(100, 200, 1)
