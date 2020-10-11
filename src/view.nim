@@ -25,10 +25,12 @@ const
   colCursor       = sdl.Color(r:255, g:128, b:128, a:255)
   colMeasure      = sdl.Color(r:255, g:255, b:128, a: 32)
   colEvent        = sdl.Color(r:  0, g:255, b:173, a:150)
-  colKey          = sdl.Color(r:250, g:200, b:100, a:255)
+  colKey          = sdl.Color(r:255, g:200, b:  0, a:128)
+  colKeyOpen      = sdl.Color(r:255, g:200, b:  0, a:255)
   colEventSel     = sdl.Color(r:255, g:255, b:255, a: 30)
   colStatusbar    = sdl.Color(r:255, g:255, b:255, a:128)
-  colGraph        = sdl.Color(r:  0, g:255, b:173, a:150)
+  colGraphEvent   = sdl.Color(r:255, g:255, b:  0, a: 64)
+  colGraphLine    = sdl.Color(r:255, g:255, b:  0, a:250)
 
 type
 
@@ -244,12 +246,22 @@ proc drawData(v: View, root: Group) =
   proc drawEvents(g: Group, y: int, h: int) =
 
     var rects = newSeqOfCap[Rect](g.events.len)
+    var graphRects = newSeqOfCap[Rect](g.events.len)
     var points: seq[Point]
-    var xprev = 0
+    var xprev = int.low
 
     # Binary search for event indices which lie in the current view
     var i1 = g.events.lowerbound(v.ts.v1, (e, t) => cmp(if e.ts.v2 != NoTime: e.ts.v2 else: e.ts.v1, t))
     var i2 = g.events.upperbound(v.ts.v2, (e, t) => cmp(e.ts.v1, t))
+
+    if i1 > 0: dec i1
+    if i2 < g.events.len: inc i2
+
+    var vmin = Value.high
+    var vMax = Value.low
+
+    proc v2y(v: float): int =
+      y + h - int(h.float * (v - g.vs.v1) / (g.vs.v2 - g.vs.v1))
 
     # Iterate visible events
     for i in i1 ..< i2:
@@ -261,6 +273,10 @@ proc drawData(v: View, root: Group) =
         else:
           max(v.time2x(e.ts.v2), x1+1)
 
+      if e.value != NoValue:
+        vMin = min(vMin, e.value)
+        vMax = max(vMax, e.value)
+
       # Only draw this event if it gets drawn on a different pixel then the
       # previous event
       if x2 > xprev:
@@ -270,8 +286,12 @@ proc drawData(v: View, root: Group) =
 
         if e.value != NoValue:
           # Events with a value get graphed
-          let y2 = y + h - int(h.float * (e.value - g.vs.v1) / (g.vs.v2 - g.vs.v1))
-          points.add Point(x: x1, y: y2)
+          let y1 = v2y(vMax)
+          let y2 = v2y(vMin)
+          points.add Point(x: x1, y: (y1+y2) div 2)
+          graphRects.add Rect(x: x1, y: y1, w: x2-x1, h: y2-y1)
+          vmin = Value.high
+          vMax = Value.low
         else:
           # Draw event bar
           rects.add Rect(x: x1, y: y, w: x2-x1, h: h)
@@ -296,11 +316,14 @@ proc drawData(v: View, root: Group) =
       col.a = uint8(v.alpha * 255)
       v.setColor(col)
       discard v.rend.renderFillRects(rects[0].addr, rects.len)
-      #discard v.rend.renderDrawRects(rects[0].addr, rects.len)
+    
+    # Render graph events and lines
+    if graphRects.len > 0:
+      v.setColor(colGraphEvent)
+      discard v.rend.renderFillRects(graphRects[0].addr, graphRects.len)
 
-    # Render all graph lines
     if points.len > 0:
-      v.setColor(colGraph)
+      v.setColor(colGraphLine)
       discard v.rend.renderDrawLines(points[0].addr, points.len)
 
 
@@ -316,8 +339,7 @@ proc drawData(v: View, root: Group) =
 
     # Draw label and events for this group
     var h = 0
-    var c = colKey
-    c.a = uint8(255.0 / sqrt(depth.float))
+    var c = if isOpen: colKeyOpen else: colKey
     labels.add Label(x: depth*10, y: y, text: g.id, col: c)
     if g.events.len > 0:
       h = v.rowSize * scale
@@ -632,9 +654,9 @@ proc sdlEvent*(v: View, e: sdl.Event) =
 
     if e.kind == sdl.MouseButtonUp:
       let b = e.button.button
-
       v.gui.mouseButton e.button.x, e.button.y, 0
       v.dragButton = 0
+
       if v.dragged < 3:
 
         if b == sdl.BUTTON_Left:
@@ -642,7 +664,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
             if v.curGroup in v.isOpen:
               v.isOpen.excl v.curGroup
             else:
-              v.isOpen.incl v.curGroup
+              if v.curGroup.groups.len > 0:
+                v.isOpen.incl v.curGroup
 
         if b == sdl.BUTTON_RIGHT:
           if v.curGroup != nil:
@@ -650,9 +673,9 @@ proc sdlEvent*(v: View, e: sdl.Event) =
             let dt = v.curGroup.ts.v2 - v.curGroup.ts.v1
             v.ts.v1 = v.curGroup.ts.v1 - (dt / 5)
             v.ts.v2 = v.curGroup.ts.v2 + (dt / 20)
-  
-        if b == sdl.BUTTON_MIDDLE:
-          v.tMeasure = NoTime
+
+      if b == sdl.BUTTON_MIDDLE:
+        v.tMeasure = NoTime
 
     if e.kind == sdl.MouseWheel:
       if v.curGroup != nil:

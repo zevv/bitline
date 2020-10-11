@@ -39,7 +39,7 @@ proc graphs(t1, t2: float, depth: int) =
   let dt = (t2 - t1) / pow(2.0, depth.float)
   var t = t1
   var v = 0.0
-  while t < t2:
+  while t <= t2:
     echo t, " graph.", depth, " ! ", sin(v)
     v += 0.1
     t += dt
@@ -49,6 +49,6 @@ proc graphs(t1, t2: float, depth: int) =
 
 
 
-noise(100, 200, 1)
 graphs(100, 200, 1)
+noise(100, 200, 1)
 pow2(100, 200, 1)
