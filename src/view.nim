@@ -24,13 +24,14 @@ const
   colGrid         = sdl.Color(r:196, g:196, b:196, a: 96)
   colCursor       = sdl.Color(r:255, g:128, b:128, a:255)
   colMeasure      = sdl.Color(r:255, g:255, b:128, a: 32)
-  colEvent        = sdl.Color(r:  0, g:255, b:173, a:150)
   colKey          = sdl.Color(r:255, g:200, b:  0, a:128)
   colKeyOpen      = sdl.Color(r:255, g:200, b:  0, a:255)
   colEventSel     = sdl.Color(r:255, g:255, b:255, a: 30)
   colStatusbar    = sdl.Color(r:255, g:255, b:255, a:128)
-  colGraphEvent   = sdl.Color(r:255, g:255, b:  0, a: 64)
-  colGraphLine    = sdl.Color(r:255, g:255, b:  0, a:250)
+
+  colEvent        = sdl.Color(r:  0, g:255, b:173, a:150)
+  colGraphEvent   = sdl.Color(r:  0, g:255, b:173, a: 64)
+  colGraphLine    = sdl.Color(r:  0, g:255, b:173, a:250)
 
 type
 
@@ -249,6 +250,12 @@ proc drawData(v: View, root: Group) =
     var graphRects = newSeqOfCap[Rect](g.events.len)
     var points: seq[Point]
     var xprev = int.low
+    
+    var vmin = Value.high
+    var vMax = Value.low
+
+    let pixelsPerValue = if g.vs.v1 != g.vs.v2: h.float / (g.vs.v2 - g.vs.v1) else: 0.0
+    proc v2y(v: float): int = y + h - int((v - g.vs.v1) * pixelsPerValue)
 
     # Binary search for event indices which lie in the current view
     var i1 = g.events.lowerbound(v.ts.v1, (e, t) => cmp(if e.ts.v2 != NoTime: e.ts.v2 else: e.ts.v1, t))
@@ -257,15 +264,10 @@ proc drawData(v: View, root: Group) =
     if i1 > 0: dec i1
     if i2 < g.events.len: inc i2
 
-    var vmin = Value.high
-    var vMax = Value.low
-
-    proc v2y(v: float): int =
-      y + h - int(h.float * (v - g.vs.v1) / (g.vs.v2 - g.vs.v1))
-
     # Iterate visible events
     for i in i1 ..< i2:
 
+      # Calculate x for event start and end time
       let e = g.events[i]
       var x1 = v.time2x(e.ts.v1)
       var x2 = if e.ts.v2 == NoTime or e.ts.v2 == e.ts.v1:
@@ -273,6 +275,7 @@ proc drawData(v: View, root: Group) =
         else:
           max(v.time2x(e.ts.v2), x1+1)
 
+      # Keep track of min and max of events with values
       if e.value != NoValue:
         vMin = min(vMin, e.value)
         vMax = max(vMax, e.value)
@@ -284,17 +287,16 @@ proc drawData(v: View, root: Group) =
         # Never overlap over previous events
         x1 = max(x1, xprev)
 
-        if e.value != NoValue:
+        if e.value == NoValue:
+          # Draw event bar
+          rects.add Rect(x: x1, y: y, w: x2-x1, h: h)
+        else:
           # Events with a value get graphed
-          let y1 = v2y(vMax)
-          let y2 = v2y(vMin)
+          let (y1, y2) = (vMax.v2y, vMin.v2y)
           points.add Point(x: x1, y: (y1+y2) div 2)
           graphRects.add Rect(x: x1, y: y1, w: x2-x1, h: y2-y1)
           vmin = Value.high
           vMax = Value.low
-        else:
-          # Draw event bar
-          rects.add Rect(x: x1, y: y, w: x2-x1, h: h)
 
         # Incomplete span gets a little arrow
         if e.ts.v2 == NoTime:
