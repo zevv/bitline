@@ -34,20 +34,6 @@ const
   readBufSize = 256 * 1024
 
 
-const helpText = """
-     a       zoom all
-     c       close all
-     [ / ]   adjust alpha
-     + / -   adjust font size
- shift       measure
-
-   LMB       drag: pan    click: open
-   RMB       drag: zoom   click: open & focus
-   MMM       drag: row height
-"""
-
-
-
 
 proc addEvent(app: App, t: Time, key, ev, evdata: string) =
 
@@ -239,7 +225,7 @@ proc run*(app: App): bool =
 
     if redraw > 0:
       for _, v in app.views:
-        v.draw(app.root, app.stats)
+        v.draw(app.stats)
       dec redraw
 
     let t1 = cpuTime()

@@ -99,6 +99,9 @@ proc duration*(ts: TimeSpan): float =
 proc contains*[T](s: Span[T], v: T): bool =
   v >= s.v1 and v <= s.v2
 
+proc overlaps*[T](s1: Span[T], s2: Span[T]): bool =
+  s1.v1 <= s2.v2 and s1.v2 >= s2.v1 
+
 
 proc fmtDuration*(d: Time): string =
   let d = abs(d)

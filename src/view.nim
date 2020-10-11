@@ -14,8 +14,9 @@ import hashes
 #import chroma
 import tables
 import math
-import textcache
 
+import textcache
+import usage
 import gui
 import misc
 
@@ -37,6 +38,7 @@ type
 
   View* = ref object
     ts: TimeSpan
+    root: Group
     pixelsPerSecond: float
     tMeasure: Time
     ytop: int
@@ -63,7 +65,6 @@ type
   CmdLine = ref object
     active: bool
     s: string
-    pos: int
 
   ViewStats = object
     renderTime: float
@@ -241,7 +242,7 @@ proc measure(v: View, group: Group): string =
   result.add parts.join(", ")
 
 
-proc drawData(v: View, root: Group) =
+proc drawData(v: View) =
 
   v.curGroup = nil
   v.curEvent.ts.v1 = NoTime
@@ -351,13 +352,17 @@ proc drawData(v: View, root: Group) =
 
   proc drawGroup(g: Group, depth: int) =
 
+    if not v.ts.overlaps(g.ts):
+      echo g.ts, " ", v.ts
+      return
+
     let isOpen = g in v.isOpen
     let yGroup = y
     let scale = 1 shl v.groupScale.getOrDefault(g, 0)
 
     # Horizontal separator
     v.setColor(colGrid)
-    v.drawLine(0, y, v.w, y)
+    v.drawLine(0, y-1, v.w, y-1)
 
     # Draw label and events for this group
     var h = 0
@@ -365,7 +370,7 @@ proc drawData(v: View, root: Group) =
     labels.add Label(x: depth*10, y: y, text: g.id, col: c)
     if g.events.len > 0:
       h = v.rowSize * scale
-      drawEvents(g, y + 2, h)
+      drawEvents(g, y + 1, h)
 
     # Draw measurements for this group
     if v.tMeasure != NoTime:
@@ -402,7 +407,7 @@ proc drawData(v: View, root: Group) =
 
   # Recursively draw all groups
 
-  drawGroup(root, 0)
+  drawGroup(v.root, 0)
 
   # Draw evdata for current event
 
@@ -491,6 +496,7 @@ proc newView*(root: Group, w, h: int): View =
 
   v.w = w
   v.h = h
+  v.root = root
   v.gui = newGui(v.rend, v.textcache)
   v.ts.v1 = getTime().toUnixFloat
   v.ts.v2 = v.ts.v1 + 60.0
@@ -530,7 +536,7 @@ proc getWindow*(v: View): Window =
 proc setTMeasure*(v: View, t: Time) =
   v.tMeasure = t
 
-proc draw*(v: View, root: Group, appStats: AppStats) =
+proc draw*(v: View, appStats: AppStats) =
 
   if v.ts.v2 == NoTime:
     echo "no time"
@@ -552,7 +558,7 @@ proc draw*(v: View, root: Group, appStats: AppStats) =
   discard v.rend.rendersetClipRect(addr rMain)
 
   v.drawGrid()
-  v.drawData(root)
+  v.drawData()
 
   discard v.rend.rendersetClipRect(nil)
 
@@ -564,6 +570,20 @@ proc draw*(v: View, root: Group, appStats: AppStats) =
   v.rend.renderPresent
 
   v.stats.renderTime = cpuTime() - t1
+
+
+proc handleCmd(v: View, s: string) =
+  if s[0] == '/':
+    let search = s[1..^1]
+    proc aux(g: Group): bool =
+      result = g.id.toLowerAscii.find(search.toLowerAscii) != -1
+      for id, gc in g.groups:
+        if aux(gc):
+          result = true
+      if result:
+        v.isOpen.incl g
+    discard aux(v.root)
+
 
 
 proc sdlEvent*(v: View, e: sdl.Event) =
@@ -587,6 +607,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         case key
         of sdl.K_RETURN:
           c.active = false
+          v.handleCmd(c.s)
+          c.s=""
         of sdl.K_ESCAPE:
           c.active = false
         of sdl.K_BACKSPACE:
@@ -595,12 +617,12 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         else:
           discard
 
-      when true:
+      else:
 
         case key
         of sdl.K_ESCAPE, sdl.K_Q:
           quit(0)
-        of sdl.K_SEMICOLON:
+        of sdl.K_SEMICOLON, sdl.K_SLASH:
           c.active = true
         of sdl.K_EQUALS:
           inc v.rowSize
@@ -614,6 +636,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.tMeasure = v.x2time(v.mouseX)
         of sdl.K_LALT:
           v.showGui = true
+        of sdl.K_a:
+          v.yTop = 0
         of sdl.K_c:
           v.closeAll()
         of sdl.K_COMMA:
@@ -624,8 +648,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
             v.panX -50
         of sdl.K_RIGHT:
             v.panX 50
-        #of sdl.K_h:
-        #  discard sdl.showSimpleMessageBox(0, "help", helpText, v.getWindow());
+        of sdl.K_h:
+          discard sdl.showSimpleMessageBox(0, "help", usage(), v.getWindow());
         else:
           discard
 
