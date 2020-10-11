@@ -26,7 +26,7 @@ const
   colMeasure      = sdl.Color(r:255, g:255, b:128, a: 32)
   colKey          = sdl.Color(r:255, g:200, b:  0, a:128)
   colKeyOpen      = sdl.Color(r:255, g:200, b:  0, a:255)
-  colEventSel     = sdl.Color(r:255, g:255, b:255, a: 30)
+  colGroupSel     = sdl.Color(r:255, g:255, b:255, a: 15)
   colStatusbar    = sdl.Color(r:255, g:255, b:255, a:128)
 
   colEvent        = sdl.Color(r:  0, g:255, b:173, a:150)
@@ -202,11 +202,18 @@ proc measure(v: View, group: Group): string =
 
   var count = 0
   var time = 0.0
+  var vMin = Value.high
+  var vMax = Value.low
 
   proc aux(g: Group) =
     for id, ev in g.events:
+
       if ts1 < ev.ts.v1 and ts2 >= ev.ts.v2:
         inc count
+        if ev.value != NoValue:
+          vMin = min(vMin, ev.value)
+          vMax = max(vMax, ev.value)
+
       let tsint1 = max(ts1, ev.ts.v1)
       let tsint2 = min(ts2, ev.ts.v2)
       if tsint2 > tsint1:
@@ -221,12 +228,17 @@ proc measure(v: View, group: Group): string =
 
   let dutyCycle = 100.0 * time / (ts2-ts1)
 
-  parts.add siFmt(count, "",  true)
+  parts.add "n=" & siFmt(count)
   if time > 0:
-    parts.add siFmt(time,  "s", true)
-    parts.add &"{dutyCycle:.1f}%"
+    parts.add "t=" & siFmt(time,  "s")
+    parts.add "dc=" & &"{dutyCycle:.1f}%"
 
-  result.add parts.join(" / ")
+  if vMin != Value.high:
+    parts.add "min=" & siFmt(vMin)
+    parts.add "max=" & siFmt(vMax)
+    parts.add "avg=" & siFmt((vMin + vMax) / 2)
+
+  result.add parts.join(", ")
 
 
 proc drawData(v: View, root: Group) =
@@ -251,7 +263,7 @@ proc drawData(v: View, root: Group) =
     var points: seq[Point]
     var xprev = int.low
     
-    var vmin = Value.high
+    var vMin = Value.high
     var vMax = Value.low
 
     let pixelsPerValue = if g.vs.v1 != g.vs.v2: h.float / (g.vs.v2 - g.vs.v1) else: 0.0
@@ -339,13 +351,17 @@ proc drawData(v: View, root: Group) =
     let yGroup = y
     let scale = 1 shl v.groupScale.getOrDefault(g, 0)
 
+    # Horizontal separator
+    v.setColor(colGrid)
+    v.drawLine(0, y, v.w, y)
+
     # Draw label and events for this group
     var h = 0
     var c = if isOpen: colKeyOpen else: colKey
     labels.add Label(x: depth*10, y: y, text: g.id, col: c)
     if g.events.len > 0:
       h = v.rowSize * scale
-      drawEvents(g, y, h)
+      drawEvents(g, y + 2, h)
 
     # Draw measurements for this group
     if v.tMeasure != NoTime:
@@ -366,16 +382,17 @@ proc drawData(v: View, root: Group) =
           aux(cg)
       aux(g)
 
-    y = max(y, yGroup + v.rowSize) + 4
+    y = max(y, yGroup + v.rowSize) + 3
 
     if isOpen:
       for id, cg in g.groups:
         drawGroup(cg, depth+1)
 
     # Check for mouse hover
-    if v.mouseY >= yGroup and v.mouseY < y and v.curGroup == nil:
-      v.curGroup = g
-      v.setColor(colEventSel)
+    if v.mouseY >= yGroup and v.mouseY < y:
+      if v.curGroup == nil:
+        v.curGroup = g
+      v.setColor(colGroupSel)
       v.drawFillRect(0, yGroup, v.w, y-1)
 
 
