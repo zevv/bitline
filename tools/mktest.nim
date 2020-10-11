@@ -12,7 +12,7 @@ proc pow2(t1, t2: float, depth: int) =
     echo t+dt, " pow2.", depth, " -"
     t += dt*2
 
-  if depth < 21:
+  if depth < 20:
     pow2(t1, t2, depth+1)
 
 

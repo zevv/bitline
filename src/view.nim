@@ -27,7 +27,7 @@ const
   colMeasure      = sdl.Color(r:255, g:255, b:128, a: 32)
   colKey          = sdl.Color(r:255, g:200, b:  0, a:128)
   colKeyOpen      = sdl.Color(r:255, g:200, b:  0, a:255)
-  colGroupSel     = sdl.Color(r:255, g:255, b:255, a: 15)
+  colGroupSel     = sdl.Color(r:255, g:128, b:255, a: 15)
   colStatusbar    = sdl.Color(r:255, g:255, b:255, a:128)
 
   colEvent        = sdl.Color(r:  0, g:255, b:173, a:150)
@@ -353,7 +353,6 @@ proc drawData(v: View) =
   proc drawGroup(g: Group, depth: int) =
 
     if not v.ts.overlaps(g.ts):
-      echo g.ts, " ", v.ts
       return
 
     let isOpen = g in v.isOpen
