@@ -21,7 +21,7 @@ import gui
 import misc
 
 const
-  colBg           = sdl.Color(r: 32, g: 32, b: 32, a:255)
+  colBg           = sdl.Color(r: 16, g: 16, b: 16, a:255)
   colGrid         = sdl.Color(r:196, g:196, b:196, a: 96)
   colCursor       = sdl.Color(r:255, g:128, b:128, a:255)
   colMeasure      = sdl.Color(r:255, g:255, b:128, a: 32)

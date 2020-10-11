@@ -15,16 +15,17 @@ from posix import nil
 
 import misc
 import view
+import reader
 
 
 type
-  App* = ref object
-    root*: Group
-    views*: Table[uint32, View]
-    gidCache*: Table[string, Group]
-    rxBuf*: string
-    rxPtr*: int
-    stats*: AppStats
+
+  App = ref object
+    root: Group
+    views: Table[uint32, View]
+    gidCache: Table[string, Group]
+    stats: AppStats
+    readers: seq[Reader]
 
 
 const
@@ -100,64 +101,6 @@ proc updateEvents(app: App, updateViews=false) =
     v.setSpan(ts, updateViews)
 
 
-proc parseEvent(app: App, l: string) =
-  let r = l.splitWhiteSpace(3)
-
-  if r.len >= 3:
-
-    let (ts, key, ev) = (r[0], r[1], r[2])
-    let evdata = if r.len == 4: r[3] else: ""
-    var t = NoTime
-
-    try:
-      t = ts.parse(iso8601format).toTime.toUnixFloat
-    except:
-      discard
-
-    try:
-      t = ts.parseFloat()
-    except:
-      discard
-
-    if t != NoTime:
-      app.addEvent(t, key, ev, evdata)
-
-
-proc readEvents(app: App): bool =
-  var count = 0
-
-  var pfds: seq[posix.TPollfd]
-  pfds.add posix.TPollfd(fd: 0.cint, events: posix.POLLIN)
-
-  let r = posix.poll(pfds[0].addr, posix.Tnfds(pfds.len), 0)
-  if r == 0:
-    return false
-
-  let n = posix.read(0, app.rxBuf[app.rxPtr].addr, readBufSize - app.rxPtr)
-  if n <= 0:
-    return false
-
-  app.rxPtr += n
-  var o1 = 0
-  var o2 = 0
-
-  while true:
-    o2 = app.rxBuf.find("\n", o1, app.rxPtr-1)
-    if o2 > -1:
-      let l = app.rxBuf[o1..<o2]
-      app.parseEvent(l)
-      inc count
-      o1 = o2 + 1
-    else:
-      let nLeft = app.rxPtr - o1
-      if nLeft > 0:
-        moveMem(app.rxBuf[0].addr, app.rxBuf[o1].addr, nLeft)
-      app.rxPtr = nLeft
-      break
-
-
-  return count > 0
-
 
 proc pollSdl(app: App): bool =
 
@@ -227,8 +170,18 @@ proc run*(app: App): bool =
 
     let t1 = cpuTime()
     var needUpdate = false
-    while app.readEvents() and cpuTime() - t1 < 0.01:
-      needUpdate = true
+
+    while true:
+      var worked = false
+      for r in app.readers:
+        if r.read():
+          needUpdate = true
+          worked = true
+      if not worked:
+        break
+      if cpuTime() - t1 > 0.01:
+        break
+
     if needUpdate:
       app.updateEvents()
       redraw = 2
@@ -237,30 +190,44 @@ proc run*(app: App): bool =
       sleep 10
 
 
-
 proc newApp*(w, h: int): App =
 
   let app = App()
   app.root = Group(id: "/")
-  app.rxBuf = newString(readBufSize)
-
   let v = newView(app.root, w, h)
   app.views[sdl.getWindowId(v.getWindow())] = v
-
-  discard app.readEvents()
-  app.updateEvents(true)
-
   return app
+  
 
 
-discard sdl.init(sdl.InitVideo or sdl.InitAudio)
-let a = newApp(600, 400)
+proc addReader(app: App, fname: string) =
 
-echo sizeof(Event)
+  echo "Add reader ", fname
 
-#a.loadEvents("events")
-discard a.run()
+  var fname = fname
+  if fname == "-":
+    fname = "/dev/stdin"
 
+  let onEvent = proc(t: Time, key, ev, evdata: string) =
+    app.addEvent(t, key, ev, evdata)
+
+  let reader = newReader(fname, onEvent)
+  if reader != nil:
+    app.readers.add reader
+
+
+
+proc main() =
+  discard sdl.init(sdl.InitVideo or sdl.InitAudio)
+  let a = newApp(600, 400)
+
+  for fname in commandLineParams():
+    a.addReader(fname)
+  
+  discard a.run()
+
+
+main()
 
 # vi: ft=nim sw=2 ts=2 
 
