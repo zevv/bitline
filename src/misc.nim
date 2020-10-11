@@ -30,7 +30,7 @@ type
     groups*: OrderedTable[string, Group]
     events*: seq[Event]
 
-  Event* = ref object
+  Event* = object
     ts*: TimeSpan
     data*: string
     value*: Value
@@ -105,7 +105,9 @@ proc siFmt*(v: SomeNumber, unit="", align=false): string =
     fs.trimZeros()
     if align:
       fs = fs.align(5)
-    &"{fs}{suffix}{unit}"
+    var sign = " "
+    if v < 0: sign = "-"
+    &"{sign}{fs}{suffix}{unit}"
 
   if f == 0.0:
     format(0, "")

@@ -378,6 +378,8 @@ proc newApp*(w, h: int): App =
 discard sdl.init(sdl.InitVideo or sdl.InitAudio)
 let a = newApp(600, 400)
 
+echo sizeof(Event)
+
 #a.loadEvents("events")
 discard a.run()
 

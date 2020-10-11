@@ -193,7 +193,7 @@ proc drawData*(v: View) =
 
   let app = v.app
   v.curGroup = nil
-  v.curEvent = nil
+  v.curEvent.ts.v1 = NoTime
 
   type Label = object
     text: string
@@ -233,18 +233,20 @@ proc drawData*(v: View) =
         x1 = max(x1, xprev)
 
         # Graph events with a value
-        if h > 1 and e.value != NoValue:
+        if e.value != NoValue:
           let y2 = y + h - int(h.float * (e.value - g.vs.v1) / (g.vs.v2 - g.vs.v1))
           points.add Point(x: x1, y: y2)
-
-        # Draw event bar
-        rects.add Rect(x: x1, y: y, w: x2-x1, h: h)
+        else:
+          # Draw event bar
+          rects.add Rect(x: x1, y: y, w: x2-x1, h: h)
 
         # Incomplete span gets a little arrow
         if e.ts.v2 == NoTime:
           for i in 1..<h /% 2:
             rects.add Rect(x: x1+i, y: y+i, w: 1, h: h-i*2)
 
+        # Always leave a gap of 1 pixel between event, this makese sure gaps do
+        # not go unnoticed, on any zoom level
         xprev = x2 + 1
 
       # Check for hovering
@@ -320,11 +322,11 @@ proc drawData*(v: View) =
   # Draw evdata for current event
 
   let e = v.curEvent
-  if e != nil and v.tMeasure == NoTime:
+  if e.ts.v1 != NoTime and v.tMeasure == NoTime:
     if e.value != NoValue:
-      labels.add Label(x: v.mouseX, y: v.mouseY, text: e.value.siFmt, col: colEvent)
+      labels.add Label(x: v.mouseX + 15, y: v.mouseY, text: e.value.siFmt, col: colEvent)
     elif e.data != "":
-      labels.add Label(x: v.mouseX, y: v.mouseY, text: e.data, col: colEvent)
+      labels.add Label(x: v.mouseX + 15, y: v.mouseY, text: e.data, col: colEvent)
 
   # Render all labels on top
 
