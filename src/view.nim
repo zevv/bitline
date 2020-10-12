@@ -1,6 +1,4 @@
 
-import sdl2/sdl except Event
-import sdl2/sdl_ttf as ttf
 import sets
 import algorithm
 import sugar
@@ -11,9 +9,12 @@ import npeg
 import strformat
 import times except Time
 import hashes
-#import chroma
 import tables
 import math
+
+import chroma except Color
+import sdl2/sdl except Event
+import sdl2/sdl_ttf as ttf
 
 import textcache
 import usage
@@ -77,30 +78,14 @@ proc time2x(v: View, t: Time): int =
 proc x2time(v: View, x: int): Time =
   v.ts.v1 + (x / v.w) * (v.ts.v2 - v.ts.v1)
 
-proc hsv2color(h, s, v: float): Color =
 
-  var h = h * 6.0
-  var i = (int)floor(h)
-  var f = (h) - i.float
-  if (i and 1) == 0:
-    f = 1 - f
-  var m = v * (1 - s)
-  var n = v * (1 - s * f)
-  i = i mod 6
-
-  return case i
-    of 6,0: Color(r:uint8(v*255), g:uint8(n*255), b:uint8(m*255), a:255)
-    of 1:   Color(r:uint8(n*255), g:uint8(v*255), b:uint8(m*255), a:255)
-    of 2:   Color(r:uint8(m*255), g:uint8(v*255), b:uint8(n*255), a:255)
-    of 3:   Color(r:uint8(m*255), g:uint8(n*255), b:uint8(v*255), a:255)
-    of 4:   Color(r:uint8(n*255), g:uint8(m*255), b:uint8(v*255), a:255)
-    of 5:   Color(r:uint8(v*255), g:uint8(m*255), b:uint8(n*255), a:255)
-    else:   Color(r:uint8(255),   g:uint8(255)  , b:uint8(255)  , a:255)
+var C = 100.0
+var L =  60.0
 
 proc color(g: Group): Color =
-  let hue = g.bin.float / 9.0 + 0.5
-  hsv2color(hue, 0.8, 1.0)
-
+  let hue = g.bin.float / 9.0 * 360 + 160
+  let col = chroma.ColorHCL(h: hue, c: C, l: L).color()
+  Color(r: (col.r * 255).uint8, g: (col.g * 255).uint8, b: (col.b * 255).uint8, a: 255.uint8)
 
 # Drawing primitives
 
@@ -492,8 +477,10 @@ proc drawGui(v: View) =
     return
 
   v.gui.start(0, 0)
-  v.gui.start(PackHor)
+  v.gui.start(PackVer)
 
+  discard v.gui.slider("C", C, 0, 100, true)
+  discard v.gui.slider("L", L, 0, 100, true)
 
   v.gui.stop()
   v.gui.stop()
@@ -615,7 +602,9 @@ proc setBin(g: Group, bin: Bin) =
 
 proc sdlEvent*(v: View, e: sdl.Event) =
 
-    if e.kind == sdl.TextInput:
+  case e.kind
+
+    of sdl.TextInput:
       let
         c = v.cmdLine
       if c.active:
@@ -624,10 +613,12 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           c.s.add $e.text.text[i]
           inc i
 
-    if e.kind == sdl.KeyDown:
+    of sdl.KeyDown:
       let
         key = e.key.keysym.sym
         c = v.cmdLine
+      if e.key.repeat == 1:
+        return
       echo key.repr
 
       if c.active:
@@ -657,7 +648,7 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           dec v.rowSize
         of sdl.K_LSHIFT:
           v.tMeasure = v.x2time(v.mouseX)
-        of sdl.K_LALT:
+        of sdl.K_s:
           v.showGui = true
         of sdl.K_a:
           v.yTop = 0
@@ -667,30 +658,36 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           if v.curGroup != nil:
             v.curGroup.setBin (key.int - sdl.K_1.int)
         of sdl.K_COMMA:
-            v.zoomX 1.0/0.9
+          v.zoomX 1.0/0.9
         of sdl.K_PERIOD:
-            v.zoomX 0.9
+          v.zoomX 0.9
         of sdl.K_LEFT:
-            v.panX -50
+          v.panX -50
         of sdl.K_RIGHT:
-            v.panX 50
+          v.panX +50
+        of sdl.K_UP:
+          v.yTop += 50
+        of sdl.K_DOWN:
+          v.yTop -= 50
         of sdl.K_h:
           discard sdl.showSimpleMessageBox(0, "help", usage(), v.getWindow());
         else:
           discard
 
-    if e.kind == sdl.KeyUp:
+    of sdl.KeyUp:
       let key = e.key.keysym.sym
       case key
       of sdl.K_LSHIFT:
         v.tMeasure = NoTime
-      of sdl.K_LALT:
+      of sdl.K_s:
         v.showGui = false
       else:
         discard
 
-    if e.kind == sdl.MouseMotion:
-      v.gui.mouseMove e.motion.x, e.motion.y
+    of sdl.MouseMotion:
+      if v.gui.mouseMove(e.motion.x, e.motion.y):
+        return
+
       v.mouseX = e.motion.x
       v.mouseY = e.motion.y
       let dx = v.dragX - v.mouseX
@@ -711,18 +708,22 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.zoomX pow(1.01, dy.float)
           v.panX dx
 
-    if e.kind == sdl.MouseButtonDown:
+    of sdl.MouseButtonDown:
       let b = e.button.button
-      v.gui.mouseButton e.button.x, e.button.y, 1
+      if v.gui.mouseButton(e.button.x, e.button.y, 1):
+        return
+
       v.dragButton = b
       v.dragged = 0
 
       if b == sdl.BUTTON_MIDDLE:
         v.tMeasure = v.x2time(e.button.x)
 
-    if e.kind == sdl.MouseButtonUp:
+    of sdl.MouseButtonUp:
       let b = e.button.button
-      v.gui.mouseButton e.button.x, e.button.y, 0
+      if v.gui.mouseButton(e.button.x, e.button.y, 0):
+        return
+
       v.dragButton = 0
 
       if v.dragged < 3:
@@ -745,16 +746,19 @@ proc sdlEvent*(v: View, e: sdl.Event) =
       if b == sdl.BUTTON_MIDDLE:
         v.tMeasure = NoTime
 
-    if e.kind == sdl.MouseWheel:
+    of sdl.MouseWheel:
       if v.curGroup != nil:
         let h = v.groupScale.mgetOrPut(v.curGroup, 0)
         inc v.groupScale[v.curGroup], e.wheel.y
         v.groupScale[v.curGroup] = v.groupScale[v.curGroup].clamp(0, 6)
 
-    if e.kind == sdl.WindowEvent:
+    of sdl.WindowEvent:
       if e.window.event == sdl.WINDOWEVENT_RESIZED:
         v.w = e.window.data1
         v.h = e.window.data2
+
+    else:
+      discard
 
 
 # vi: ft=nim sw=2 ts=2

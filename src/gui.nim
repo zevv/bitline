@@ -59,6 +59,7 @@ proc newGui*(rend: Renderer, textCache: TextCache): Gui =
   return g
 
 proc isActive*(g: Gui): bool =
+  echo "isactive ", g.id_active
   return g.id_active != ""
 
 proc updatePos(g: Gui, dx, dy: int) =
@@ -85,14 +86,16 @@ proc horizontal*(g: Gui) =
 proc vertical*(g: Gui) =
   g.box.packDir = PackVer
 
-proc mouseMove*(g: Gui, x, y: int) =
+proc mouseMove*(g: Gui, x, y: int): bool =
   g.mx = x
   g.my = y
+  g.isActive()
 
-proc mouseButton*(g: Gui, x, y: int, b: int) =
+proc mouseButton*(g: Gui, x, y: int, b: int): bool =
   g.mx = x
   g.my = y
   g.mb = b
+  g.isActive()
 
 proc setBounds(g: Gui, rect: Rect) =
   let b = g.box
