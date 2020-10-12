@@ -3,7 +3,8 @@ proc usage*(): string = """
 
   keys:
    a       zoom all
-   c       close all
+   c /o    close all / open all
+   q       quit
    [ / ]   adjust alpha
    + / -   adjust font size
    shift    measure

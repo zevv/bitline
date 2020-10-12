@@ -88,7 +88,8 @@ proc updateEvents(app: App, updateViews=false) =
       g.ts.incl(g.events[^1].ts)
 
     for e in g.events:
-      g.vs.incl(e.value)
+      if e.value != NoValue:
+        g.vs.incl(e.value)
 
     for id, gc in g.groups:
       let gts = aux(gc)

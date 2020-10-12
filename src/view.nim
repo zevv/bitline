@@ -315,8 +315,13 @@ proc drawData(v: View) =
           var (y0, y1, y2) = (0.v2y, vMax.v2y, vMin.v2y)
           points.add Point(x: x1, y: (y1+y2) div 2)
 
-          if y1 < y0 and y2 < y0: y1 = max(y1, y0)
-          if y1 > y0 and y2 > y0: y2 = min(y2, y0)
+          assert y1 <= y2
+          if y1 < y0 and y2 < y0:
+            y1 = min(y1, y2)
+            y2 = y0
+          if y1 > y0 and y2 > y0:
+            y1 = y0
+            y2 = max(y1, y2)
           graphRects.add Rect(x: x1, y: y1, w: x2-x1, h: y2-y1)
 
           vmin = Value.high
@@ -386,8 +391,9 @@ proc drawData(v: View) =
 
     y += h
 
-    # For closed groups, draw a birds eye overview of all events under this group
+    # For closed groups, draw a (limited) birds eye overview of all events under this group
     if not isOpen and g.groups.len > 0:
+      var n = 0
       proc aux(g: Group) =
         if g.events.len > 0:
           let ts1 = g.events[0].ts.v1
@@ -395,8 +401,10 @@ proc drawData(v: View) =
           if ts1 < v.ts.v2 and (ts2 == NoTime or ts2 > v.ts.v1):
             drawEvents(g, y, scale)
             y += scale
-        for id, cg in g.groups:
-          aux(cg)
+            inc n
+        if n < 80:
+          for id, cg in g.groups:
+            aux(cg)
       aux(g)
 
     y = max(y, yGroup + v.rowSize) + 3
@@ -522,6 +530,13 @@ proc newView*(root: Group, w, h: int): View =
 proc closeAll*(v: View) =
   v.isOpen.clear
 
+proc openAll*(v: View) =
+  proc aux(g: Group) =
+    v.isOpen.incl g
+    for id, cg in g.groups:
+      aux(cg)
+  aux(v.root)
+
 proc setSpan*(v: View, ts: TimeSpan, force=false) =
   if force or v.ts.v1 == NoTime:
     v.ts = ts
@@ -590,6 +605,8 @@ proc handleCmd(v: View, s: string) =
           result = true
       if result:
         v.isOpen.incl g
+      if result:
+        g.bin = 5.Bin
     discard aux(v.root)
 
 
@@ -638,7 +655,7 @@ proc sdlEvent*(v: View, e: sdl.Event) =
       else:
 
         case key
-        of sdl.K_ESCAPE, sdl.K_Q:
+        of sdl.K_Q:
           quit(0)
         of sdl.K_SEMICOLON, sdl.K_SLASH:
           c.active = true
@@ -654,6 +671,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.yTop = 0
         of sdl.K_c:
           v.closeAll()
+        of sdl.K_o:
+          v.openAll()
         of sdl.K_1..sdl.K_9:
           if v.curGroup != nil:
             v.curGroup.setBin (key.int - sdl.K_1.int)

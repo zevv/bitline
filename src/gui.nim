@@ -59,7 +59,6 @@ proc newGui*(rend: Renderer, textCache: TextCache): Gui =
   return g
 
 proc isActive*(g: Gui): bool =
-  echo "isactive ", g.id_active
   return g.id_active != ""
 
 proc updatePos(g: Gui, dx, dy: int) =
