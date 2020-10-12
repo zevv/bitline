@@ -80,11 +80,11 @@ proc x2time(v: View, x: int): Time =
 
 
 var C = 100.0
-var L =  60.0
+var L =  70.0
 
 proc color(g: Group): Color =
   let hue = g.bin.float / 9.0 * 360 + 160
-  let col = chroma.ColorHCL(h: hue, c: C, l: L).color()
+  let col = chroma.ColorPolarLUV(h: hue, c: C, l: L).color()
   Color(r: (col.r * 255).uint8, g: (col.g * 255).uint8, b: (col.b * 255).uint8, a: 255.uint8)
 
 # Drawing primitives
