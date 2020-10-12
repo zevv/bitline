@@ -1,17 +1,11 @@
 
-import sets
 import strutils
 import os
-import gui
-import strformat
 import times except Time
 import hashes
 import tables
-import math
-import textcache
 
 from sdl2/sdl import nil
-from posix import nil
 
 import misc
 import view
@@ -26,11 +20,6 @@ type
     gidCache: Table[string, Group]
     stats: AppStats
     readers: seq[Reader]
-
-
-const
-  readBufSize = 256 * 1024
-
 
 
 proc addEvent(app: App, t: Time, key, ev, evdata: string) =

@@ -1,10 +1,6 @@
 
 import strutils
-import os
-import strformat
 import times except Time
-import math
-
 from posix import nil
 
 import misc

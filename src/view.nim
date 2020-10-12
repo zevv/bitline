@@ -3,7 +3,6 @@ import sets
 import algorithm
 import sugar
 import strutils
-import os
 import npeg
 import npeg
 import strformat
@@ -14,7 +13,6 @@ import math
 
 import chroma except Color
 import sdl2/sdl except Event
-import sdl2/sdl_ttf as ttf
 
 import textcache
 import usage
@@ -26,14 +24,9 @@ const
   colGrid         = sdl.Color(r:196, g:196, b:196, a: 96)
   colCursor       = sdl.Color(r:255, g:128, b:128, a:255)
   colMeasure      = sdl.Color(r:255, g:255, b:128, a: 32)
-  colKey          = sdl.Color(r:255, g:200, b:  0, a:128)
-  colKeyOpen      = sdl.Color(r:255, g:200, b:  0, a:255)
   colGroupSel     = sdl.Color(r:255, g:255, b:255, a: 10)
   colStatusbar    = sdl.Color(r:255, g:255, b:255, a:128)
-
   colEvent        = sdl.Color(r:  0, g:255, b:173, a:150)
-  colGraphEvent   = sdl.Color(r:  0, g:255, b:173, a: 64)
-  colGraphLine    = sdl.Color(r:  0, g:255, b:173, a:250)
 
 type
 
@@ -378,7 +371,6 @@ proc drawData(v: View) =
 
     # Draw label and events for this group
     var h = 0
-    #var c = if isOpen: colKeyOpen else: colKey
     var c = g.color()
     labels.add Label(x: 0, y: y, text: repeat(" ", depth) & g.id & " ", col: c)
     if g.events.len > 0:
