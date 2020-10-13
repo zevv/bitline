@@ -26,14 +26,13 @@ type
     fontSize: int
     stats: Stats
 
-const ttf = readFile("res/font.ttf")
+const ttfConst = readFile("res/font.ttf")
+let ttf = ttfConst
 
 
 proc getFont(tc: TextCache, size: int): Font =
   if size notin tc.fonts:
-    var f = ttf
-    GC_ref(f) # The memory needs to be there for the rw
-    let rw = rwFromConstMem(f[0].addr, f.len)
+    let rw = rwFromConstMem(ttf[0].unsafeAddr, ttf.len)
     let font = openFontRW(rw, 0, size)
     setFontHinting(font, HINTING_MONO);
     tc.fonts[size] = font

@@ -3,8 +3,6 @@ import sets
 import algorithm
 import sugar
 import strutils
-import npeg
-import npeg
 import strformat
 import times except Time
 import hashes

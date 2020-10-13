@@ -21,3 +21,11 @@ mouse:
 
 
 
+proc usageCmdline*(): string = """
+usage: bitline [options] [FILE...]
+
+options:
+
+  -h, --help      display this help and exit
+  -v, --version   output version information and exit
+"""
