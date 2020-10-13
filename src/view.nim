@@ -381,7 +381,10 @@ proc drawData(v: View) =
     # Draw label and events for this group
     var h = 0
     var c = g.color()
-    labels.add Label(x: 0, y: y, text: repeat(" ", depth) & g.id & " ", col: c)
+    var arrow = ""
+    if g.groups.len > 0:
+      arrow = if isOpen: "▼ " else: "▶ "
+    labels.add Label(x: 0, y: y, text: repeat(" ", depth) & arrow & g.id & " ", col: c)
     if g.events.len > 0:
       h = v.rowSize * scale
       drawEvents(g, y + 1, h)

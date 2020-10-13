@@ -185,7 +185,7 @@ proc run*(app: App): bool =
 proc newApp*(w, h: int): App =
 
   let app = App()
-  app.root = Group(id: "/")
+  app.root = Group(id: "")
   let v = newView(app.root, w, h)
   app.views[sdl.getWindowId(v.getWindow())] = v
   return app
