@@ -13,6 +13,7 @@ type
     rxBuf: string
     rxPtr: int
     cb: ReaderCallback
+    prefix: string
 
   ReaderCallback = proc(t: Time, key, ev, evdata: string)
 
@@ -25,8 +26,10 @@ proc parseEvent(reader: Reader, l: string) =
 
   let r = l.splitWhiteSpace(3)
 
-  if r.len >= 3:
+  if r.len == 2 and r[0] == "prefix":
+    reader.prefix = r[1] & "."
 
+  if r.len >= 3:
     let (ts, key, ev) = (r[0], r[1], r[2])
     let evdata = if r.len == 4: r[3] else: ""
     var t = NoTime
@@ -39,7 +42,7 @@ proc parseEvent(reader: Reader, l: string) =
       except:
         return
 
-    reader.cb(t, key, ev, evdata)
+    reader.cb(t, reader.prefix & key, ev, evdata)
 
 
 proc read*(reader: Reader): bool =

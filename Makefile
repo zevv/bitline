@@ -6,7 +6,11 @@ SRC_ALL := $(wildcard src/*.nim)
 all: $(BIN)
 
 $(BIN): $(SRC_ALL) Makefile
-	nim c -d:danger  --debugger:native -o:$(BIN) $(SRC_MAIN)
+	nim c -d:nimDebugDlOpen -d:danger --debugger:native -o:$(BIN) $(SRC_MAIN)
+
+release: $(BIN)
+	strip $(BIN)
+	scp $(BIN) ico@mdoos:~/div
 
 clean:
 	rm -f $(BIN)

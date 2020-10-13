@@ -82,8 +82,6 @@ proc siFmt*(v: SomeNumber, unit="", align=false): string =
   else:
     format(1e-9, "G")
 
-echo siFmt(1)
-
 proc initSpan*[T](v1, v2: T): Span[T] =
   Span[T](v1: v1, v2: v2)
 
@@ -93,7 +91,10 @@ proc incl*[T](s: var Span[T], v: T) =
 
 proc incl*[T](s: var Span[T], v: Span[T]) =
   s.v1 = min(s.v1, v.v1)
-  s.v2 = max(s.v2, v.v2)
+  if v.v2 != T.low:
+    s.v2 = max(s.v2, v.v2)
+  else:
+    s.v2 = max(s.v2, v.v1)
 
 proc duration*(ts: TimeSpan): float =
   ts.v2 - ts.v1
@@ -104,7 +105,6 @@ proc contains*[T](s: Span[T], v: T): bool =
 
 proc overlaps*[T](s1: Span[T], s2: Span[T]): bool =
   s1.v1 <= s2.v2 and s1.v2 >= s2.v1 
-
 
 proc fmtDuration*(d: Time): string =
   let d = abs(d)
