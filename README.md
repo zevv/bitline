@@ -3,7 +3,7 @@
 
 Bitline is a high performance tool for visualizing and inspecting time-based data.
 
-The name _Bitline_ is an hommage to my all time favourite signal analyzer software [Baudline](http://baudline.com)
+The name _Bitline_ is a homage to my all time favourite signal analyzer software [Baudline](http://baudline.com)
 
 ![BitLine](/res/bitline.png)
 
