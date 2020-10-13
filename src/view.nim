@@ -54,6 +54,7 @@ type
     rend: sdl.Renderer
     textCache: TextCache
     cmdLine: CmdLine
+    hideBin: set[Bin]
   
   CmdLine = ref object
     active: bool
@@ -75,10 +76,13 @@ proc x2time(v: View, x: int): Time =
 var C = 100.0
 var L =  70.0
 
-proc color(g: Group): Color =
-  let hue = g.bin.float / 9.0 * 360 + 160
+proc color(bin: Bin): Color =
+  let hue = bin.float / 9.0 * 360 + 160
   let col = chroma.ColorPolarLUV(h: hue, c: C, l: L).color()
   Color(r: (col.r * 255).uint8, g: (col.g * 255).uint8, b: (col.b * 255).uint8, a: 255.uint8)
+
+proc color(g: Group): Color =
+  g.bin.color()
 
 # Drawing primitives
 
@@ -358,6 +362,11 @@ proc drawData(v: View) =
 
   proc drawGroup(g: Group, depth: int) =
 
+    if g != v.root and g.bin in v.hideBin:
+      for id, cg in g.groups:
+        drawGroup(cg, depth+1)
+      return
+
     if not v.ts.overlaps(g.ts):
       return
 
@@ -468,6 +477,13 @@ proc drawStatusbar(v: View, aps: AppStats) =
   v.setColor(col)
   discard v.rend.renderFillRect(r.addr)
   v.drawText(2, v.h - h, text, colStatusbar)
+
+  for bin in Bin.low .. Bin.high:
+    var col = if bin in v.hideBin:
+      colGrid
+    else:
+      bin.color()
+    v.drawText(v.w - 128 + bin.int*16, v.h - h, $bin, col)
 
 
 
@@ -666,8 +682,15 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         of sdl.K_o:
           v.openAll()
         of sdl.K_1..sdl.K_9:
-          if v.curGroup != nil:
-            v.curGroup.setBin (key.int - sdl.K_1.int)
+          let bin = key.int - sdl.K_1.int
+          if (getModState().int32 and (KMOD_LSHIFT.int32 or KMOD_RSHIFT.int32)) != 0:
+            if bin in v.hideBin:
+              v.hideBin.excl bin
+            else:
+              v.hideBin.incl bin
+          else:
+            if v.curGroup != nil:
+              v.curGroup.setBin bin
         of sdl.K_COMMA:
           v.zoomX 1.0/0.9
         of sdl.K_PERIOD:
