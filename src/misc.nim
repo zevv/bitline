@@ -23,7 +23,7 @@ type
 
   ValueSpan* = Span[Value]
 
-  Bin* = range[0..8]
+  Bin* = range[1..9]
 
   Group* = ref object
     id*: string

@@ -31,7 +31,7 @@ proc addEvent(app: App, t: Time, key, ev, evdata: string) =
     g = app.root
     var bin = -1
     for id in key.split("."):
-      if bin == -1: bin = hash(id) mod 10
+      if bin == -1: bin = hash(id) mod 9
       if id notin g.groups:
         g.groups[id] = Group(id: id, bin: bin)
       g = g.groups[id]
@@ -185,7 +185,7 @@ proc run*(app: App): bool =
 proc newApp*(w, h: int): App =
 
   let app = App()
-  app.root = Group(id: "")
+  app.root = Group(id: "", bin: 1)
   let v = newView(app.root, w, h)
   app.views[sdl.getWindowId(v.getWindow())] = v
   return app

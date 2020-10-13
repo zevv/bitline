@@ -486,7 +486,7 @@ proc drawStatusbar(v: View, aps: AppStats) =
       colGrid
     else:
       bin.color()
-    v.drawText(v.w - 128 + bin.int*16, v.h - h, $bin, col)
+    v.drawText(v.w - 128 + bin.int*13, v.h - h, $bin, col)
 
 
 
@@ -685,7 +685,7 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         of sdl.K_o:
           v.openAll()
         of sdl.K_1..sdl.K_9:
-          let bin = key.int - sdl.K_1.int
+          let bin = key.int - sdl.K_1.int + 1
           if (getModState().int32 and (KMOD_LSHIFT.int32 or KMOD_RSHIFT.int32)) != 0:
             if bin in v.hideBin:
               v.hideBin.excl bin
