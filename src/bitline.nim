@@ -210,6 +210,9 @@ proc addReader(app: App, fname: string) =
   let reader = newReader(fname, onEvent)
   if reader != nil:
     app.readers.add reader
+    # Perform one initial read - this makes sure the first updateEvents()
+    # will be able to get proper timespan info in the groups.
+    discard reader.read()
 
 
 
@@ -239,12 +242,14 @@ proc main() =
       break
 
   discard sdl.init(sdl.InitVideo or sdl.InitAudio)
-  let a = newApp(600, 400)
+  let app = newApp(600, 400)
 
   for fname in commandLineParams():
-    a.addReader(fname)
+    app.addReader(fname)
+
+  app.updateEvents(true)
   
-  discard a.run()
+  discard app.run()
 
 
 main()
