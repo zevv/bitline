@@ -503,11 +503,6 @@ proc drawGui(v: View) =
   v.gui.stop()
 
 
-proc update(v: View) =
-  v.rowSize = v.rowSize.clamp(4, 128)
-  v.pixelsPerSecond = v.w.float / (v.ts.v2 - v.ts.v1)
-
-
 
 proc newView*(root: Group, w, h: int): View =
   let v = View()
@@ -525,8 +520,7 @@ proc newView*(root: Group, w, h: int): View =
   v.h = h
   v.root = root
   v.gui = newGui(v.rend, v.textcache)
-  v.ts.v1 = getTime().toUnixFloat
-  v.ts.v2 = v.ts.v1 + 60.0
+  v.ts = initSpan[Time](0.0, 1.0)
   v.rowSize = 12
   v.lineSpacing = 3
   v.isOpen.incl root
@@ -545,10 +539,6 @@ proc openAll*(v: View) =
     for id, cg in g.groups:
       aux(cg)
   aux(v.root)
-
-proc setSpan*(v: View, ts: TimeSpan, force=false) =
-  if force or v.ts.v1 == NoTime:
-    v.ts = ts
 
 proc zoomX*(v: View, f: float) =
   let tm = v.x2time(v.mouseX)
@@ -571,10 +561,11 @@ proc setTMeasure*(v: View, t: Time) =
 
 proc draw*(v: View, appStats: AppStats) =
 
-  if v.ts.v2 == NoTime and v.root.ts.v2 != NoTime:
+  if v.ts.v1 == 0.0 and v.ts.v2 == 1.0 and v.root.ts.v2 != NoTime:
     v.ts = v.root.ts
 
-  v.update()
+  v.rowSize = v.rowSize.clamp(4, 128)
+  v.pixelsPerSecond = v.w.float / (v.ts.v2 - v.ts.v1)
 
   let t1 = cpuTime()
 
@@ -644,7 +635,7 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         c = v.cmdLine
       if e.key.repeat == 1:
         return
-      echo key.repr
+      #echo key.repr
 
       if c.active:
         case key
@@ -677,6 +668,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.showGui = true
         of sdl.K_a:
           v.yTop = 0
+          if v.root.ts.v1 != NoTime and v.root.ts.v1 != NoTime:
+            v.ts = v.root.ts
         of sdl.K_c:
           v.closeAll()
         of sdl.K_o:

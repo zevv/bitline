@@ -13,9 +13,6 @@ import view
 import reader
 import usage
 
-const buildRev  = gorge("git rev-parse --short=10 HEAD")
-const buildTime = gorge("date '+%Y-%M-%d %H:%M:%S'")
-
 type
 
   App = ref object
@@ -77,10 +74,6 @@ proc updateGroups(app: App, updateViews=false) =
     result = g.ts
   let ts = aux(app.root)
 
-  for _, v in app.views:
-    v.setSpan(ts, updateViews)
-
-
 
 proc pollSdl(app: App): bool =
 
@@ -101,12 +94,6 @@ proc pollSdl(app: App): bool =
 
     of sdl.KeyDown:
       let v = app.views[e.key.windowId]
-      let key = e.key.keysym.sym
-      case key:
-        of sdl.K_a:
-          app.updateGroups(true)
-        else:
-          discard
       v.sdlEvent(e)
 
     of sdl.KeyUp:
@@ -222,8 +209,7 @@ proc main() =
         echo usageCmdline()
         quit(0)
       of "version", "v":
-        const NimblePkgVersion {.strdefine.} = ""
-        echo "version: " & NimblePkgVersion & ", git: " & buildRev & ", date: " & buildTime
+        echo usageVersion()
         quit(0)
       else:
         echo "Unknown option"

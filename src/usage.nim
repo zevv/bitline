@@ -1,4 +1,13 @@
 
+const buildRev = gorge("git rev-parse --short=10 HEAD")
+const buildTime = gorge("date '+%Y-%M-%d %H:%M:%S'")
+const NimblePkgVersion {.strdefine.} = ""
+
+
+proc usageVersion*(): string =
+  "version: " & NimblePkgVersion & ", git: " & buildRev & ", date: " & buildTime
+
+
 proc usage*(): string = """
 
 keys:
@@ -17,8 +26,8 @@ mouse:
  RMB           drag: zoom   click: open & zoom
  MMB           drag: row height
  wheel         adjust row size
-"""
 
+""" & usageVersion()
 
 
 proc usageCmdline*(): string = """
@@ -28,4 +37,5 @@ options:
 
   -h, --help      display this help and exit
   -v, --version   output version information and exit
-"""
+
+""" & usageVersion()
