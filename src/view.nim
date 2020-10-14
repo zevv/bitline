@@ -791,6 +791,10 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         v.w = e.window.data1
         v.h = e.window.data2
 
+    of sdl.MultiGesture:
+      let z = pow(1.02, -v.w.float * e.mgesture.dDist)
+      v.zoomx z
+
     else:
       discard
 

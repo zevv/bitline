@@ -90,14 +90,16 @@ proc pollSdl(app: App): bool =
 
     result = true
 
-    if e.kind == sdl.Quit:
+    case e.kind
+
+    of sdl.Quit:
       quit 0
 
-    if e.kind == sdl.TextInput:
+    of sdl.TextInput:
       let v = app.views[e.key.windowId]
       v.sdlEvent(e)
 
-    if e.kind == sdl.KeyDown:
+    of sdl.KeyDown:
       let v = app.views[e.key.windowId]
       let key = e.key.keysym.sym
       case key:
@@ -107,31 +109,38 @@ proc pollSdl(app: App): bool =
           discard
       v.sdlEvent(e)
 
-    if e.kind == sdl.KeyUp:
+    of sdl.KeyUp:
       let v = app.views[e.key.windowId]
       v.sdlEvent(e)
 
-    if e.kind == sdl.MouseMotion:
+    of sdl.MouseMotion:
       let v = app.views[e.motion.windowId]
       v.sdlEvent(e)
 
-    if e.kind == sdl.MouseButtonDown:
+    of sdl.MouseButtonDown:
       let v = app.views[e.button.windowId]
       v.sdlEvent(e)
 
-    if e.kind == sdl.MouseButtonUp:
+    of sdl.MouseButtonUp:
       for id, v in app.views:
         if e.button.windowId == 0 or e.button.windowID == id:
           v.sdlEvent(e)
 
-    if e.kind == sdl.MouseWheel:
+    of sdl.MouseWheel:
       let v = app.views[e.wheel.windowId]
       v.sdlEvent(e)
 
-    if e.kind == sdl.WindowEvent:
+    of sdl.WindowEvent:
       let v = app.views[e.window.windowId]
       v.sdlEvent(e)
 
+    of sdl.MultiGesture:
+      for id, v in app.views:
+        v.sdlEvent(e)
+
+    else:
+      #echo e.kind
+      discard
 
 
 proc run*(app: App): bool =
