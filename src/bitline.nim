@@ -37,13 +37,16 @@ proc addEvent(app: App, t: Time, key, ev, evdata: string) =
     for id in key.split("."):
       if bin == -1: bin = (hash(id) mod 9) + 1
       if id notin g.groups:
-        g.groups[id] = Group(id: id, bin: bin)
+        g.groups[id] = newGroup(id, bin)
       g = g.groups[id]
     app.gidCache[key] = g
+
+  g.ts.incl t
 
   var value = NoValue
   try:
     value = evdata.parseFloat()
+    g.vs.incl value
   except:
     discard
 
@@ -59,38 +62,19 @@ proc addEvent(app: App, t: Time, key, ev, evdata: string) =
       discard
 
 
+# Propagate group timespan to parents and count events
 
 proc updateEvents(app: App, updateViews=false) =
 
   app.stats.groupCount = 0
   app.stats.eventCount = 0
 
-  if app.root.groups.len == 0:
-    return
-
   proc aux(g: Group): TimeSpan =
-      
     inc app.stats.groupCount
     inc app.stats.eventCount, g.events.len
-
-    g.ts = initSpan(Time.high, Time.low)
-    g.vs = initSpan(Value.high, Value.low)
-
-    if g.events.len > 0:
-      g.ts.incl(g.events[0].ts)
-      g.ts.incl(g.events[^1].ts)
-
-    for e in g.events:
-      if e.value != NoValue:
-        g.vs.incl(e.value)
-
     for id, gc in g.groups:
-      let gts = aux(gc)
-      g.ts.v1 = min(g.ts.v1, gts.v1)
-      g.ts.v2 = max(g.ts.v2, gts.v2)
-
+      g.ts.incl aux(gc)
     result = g.ts
-
   let ts = aux(app.root)
 
   for _, v in app.views:
@@ -189,7 +173,7 @@ proc run*(app: App): bool =
 proc newApp*(w, h: int): App =
 
   let app = App()
-  app.root = Group(id: "", bin: 1)
+  app.root = newGroup()
   let v = newView(app.root, w, h)
   app.views[sdl.getWindowId(v.getWindow())] = v
   return app

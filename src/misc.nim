@@ -51,7 +51,6 @@ const
 proc hash*(g: Group): Hash =
   result = hash cast[pointer](g)
 
-
 proc siFmt*(v: SomeNumber, unit="", align=false): string =
   
   let f = abs(v.float)
@@ -82,7 +81,7 @@ proc siFmt*(v: SomeNumber, unit="", align=false): string =
   else:
     format(1e-9, "G")
 
-proc initSpan*[T](v1, v2: T): Span[T] =
+proc initSpan*[T](v1:T=T.high, v2:T=T.low): Span[T] =
   Span[T](v1: v1, v2: v2)
 
 proc incl*[T](s: var Span[T], v: T) =
@@ -115,7 +114,13 @@ proc fmtDuration*(d: Time): string =
   else:
     &"{int(d/3600.0)}h {int(d/60.0) mod 60}m {d mod 60.0:.01f}s"
 
-
 proc fmtFrequency*(f: float): string =
   siFmt(f, "Hz")
 
+proc newGroup*(id="", bin=1): Group =
+  Group(
+    id: id,
+    bin: bin,
+    ts: initSpan[Time](),
+    vs: initSpan[Value](),
+  )
