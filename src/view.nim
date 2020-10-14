@@ -571,9 +571,8 @@ proc setTMeasure*(v: View, t: Time) =
 
 proc draw*(v: View, appStats: AppStats) =
 
-  if v.ts.v2 == NoTime:
-    echo "no time"
-    return
+  if v.ts.v2 == NoTime and v.root.ts.v2 != NoTime:
+    v.ts = v.root.ts
 
   v.update()
 

@@ -64,7 +64,7 @@ proc addEvent(app: App, t: Time, key, ev, evdata: string) =
 
 # Propagate group timespan to parents and count events
 
-proc updateEvents(app: App, updateViews=false) =
+proc updateGroups(app: App, updateViews=false) =
 
   app.stats.groupCount = 0
   app.stats.eventCount = 0
@@ -102,7 +102,7 @@ proc pollSdl(app: App): bool =
       let key = e.key.keysym.sym
       case key:
         of sdl.K_a:
-          app.updateEvents(true)
+          app.updateGroups(true)
         else:
           discard
       v.sdlEvent(e)
@@ -163,7 +163,7 @@ proc run*(app: App): bool =
         break
 
     if needUpdate:
-      app.updateEvents()
+      app.updateGroups()
       redraw = 2
 
     if redraw == 0:
@@ -194,10 +194,6 @@ proc addReader(app: App, fname: string) =
   let reader = newReader(fname, onEvent)
   if reader != nil:
     app.readers.add reader
-    # Perform one initial read - this makes sure the first updateEvents()
-    # will be able to get proper timespan info in the groups.
-    discard reader.read()
-
 
 
 proc main() =
@@ -231,7 +227,7 @@ proc main() =
   for fname in commandLineParams():
     app.addReader(fname)
 
-  app.updateEvents(true)
+  app.updateGroups(true)
   
   discard app.run()
 
