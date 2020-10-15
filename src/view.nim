@@ -371,6 +371,7 @@ proc drawData(v: View) =
     let isOpen = g in v.isOpen
     let yGroup = y
     let scale = 1 shl v.groupScale.getOrDefault(g, 0)
+    let rowSize = v.rowSize * scale
 
     # Horizontal separator
     v.setColor(colGrid)
@@ -384,7 +385,7 @@ proc drawData(v: View) =
       arrow = if isOpen: "▼ " else: "▶ "
     labels.add Label(x: 0, y: y, text: repeat(" ", depth) & arrow & g.id & " ", col: c)
     if g.events.len > 0:
-      h = v.rowSize * scale
+      h = rowSize
       drawEvents(g, y + 1, h)
 
     # Draw measurements for this group
@@ -401,10 +402,10 @@ proc drawData(v: View) =
           let ts1 = g.events[0].ts.v1
           let ts2 = g.events[^1].ts.v2
           if ts1 < v.ts.v2 and (ts2 == NoTime or ts2 > v.ts.v1):
-            drawEvents(g, y, scale)
-            y += scale
+            drawEvents(g, y, 1)
+            inc y
             inc n
-        if n < 80:
+        if n < rowSize:
           for id, cg in g.groups:
             aux(cg)
       aux(g)
@@ -668,7 +669,7 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.showGui = true
         of sdl.K_a:
           v.yTop = 0
-          if v.root.ts.v1 != NoTime and v.root.ts.v1 != NoTime:
+          if v.root.ts.v1 != NoTime and v.root.ts.v2 != NoTime:
             v.ts = v.root.ts
         of sdl.K_c:
           v.closeAll()

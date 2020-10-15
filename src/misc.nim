@@ -26,6 +26,7 @@ type
   Bin* = range[1..9]
 
   Group* = ref object
+    parent*: Group
     id*: string
     ts*: TimeSpan
     vs*: ValueSpan
@@ -117,8 +118,9 @@ proc fmtDuration*(d: Time): string =
 proc fmtFrequency*(f: float): string =
   siFmt(f, "Hz")
 
-proc newGroup*(id="", bin=1): Group =
+proc newGroup*(parent: Group=nil, id="", bin=1): Group =
   Group(
+    parent: parent,
     id: id,
     bin: bin,
     ts: initSpan[Time](),

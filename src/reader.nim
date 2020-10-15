@@ -30,7 +30,7 @@ proc parseEvent(reader: Reader, l: string) =
     reader.prefix = r[1] & "."
 
   if r.len >= 3:
-    let (ts, key, ev) = (r[0], r[1], r[2])
+    let (ts, ev, key) = (r[0], r[1], r[2])
     let evdata = if r.len == 4: r[3] else: ""
     var t = NoTime
 

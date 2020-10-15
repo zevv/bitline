@@ -21,23 +21,35 @@ type
     gidCache: Table[string, Group]
     stats: AppStats
     readers: seq[Reader]
+    binSeq: Bin
 
 
-proc addEvent(app: App, t: Time, key, ev, evdata: string) =
-
+proc keyToGroup(app: App, key: string): Group =
   var g: Group
   if key in app.gidCache:
     g = app.gidCache[key]
   else:
     g = app.root
-    var bin = -1
     for id in key.split("."):
-      if bin == -1: bin = (hash(id) mod 9) + 1
       if id notin g.groups:
-        g.groups[id] = newGroup(id, bin)
-      g = g.groups[id]
-    app.gidCache[key] = g
+        g.groups[id] = g.newGroup(id)
+        g = g.groups[id]
+        if g.parent == app.root:
+          g.bin = app.binSeq
+          inc app.binSeq
+          if app.binSeq == Bin.high:
+            app.binSeq = Bin.low
+        else:
+          g.bin = g.parent.bin
+      else:
+        g = g.groups[id]
+      app.gidCache[key] = g
+  return g
 
+
+proc addEvent(app: App, t: Time, key, ev, evdata: string) =
+
+  let g = app.keytoGroup(key)
   g.ts.incl t
 
   var value = NoValue
@@ -168,8 +180,11 @@ proc run*(app: App): bool =
 
 proc newApp*(w, h: int): App =
 
-  let app = App()
-  app.root = newGroup()
+  let app = App(
+    root: newGroup(),
+    binSeq: Bin(1),
+  )
+
   let v = newView(app.root, w, h)
   app.views[sdl.getWindowId(v.getWindow())] = v
   return app

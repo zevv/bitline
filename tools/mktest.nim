@@ -8,8 +8,8 @@ proc pow2(t1, t2: float, depth: int) =
 
   var t = t1
   while t < t2:
-    echo t,    " pow2.", depth, " +"
-    echo t+dt, " pow2.", depth, " -"
+    echo t,    " + pow2.", depth
+    echo t+dt, " - pow2.", depth
     t += dt*2
 
   if depth < 20:
@@ -28,7 +28,7 @@ proc noise(t1, t2: float, depth: int) =
   sort ts
 
   for t in ts:
-    echo t, " rand.", depth, " !"
+    echo t, " ! rand.", depth
 
   if depth < 16:
     noise(t1, t2, depth+1)
@@ -40,7 +40,7 @@ proc graphs(t1, t2: float, depth: int) =
   var t = t1
   var v = 0.0
   while t <= t2:
-    echo t, " graph.", depth, " ! ", sin(v) * sin(v * 0.05)
+    echo t, " ! graph.", depth, " ", sin(v) * sin(v * 0.05)
     v += 0.1
     t += dt
 
