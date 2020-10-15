@@ -605,8 +605,6 @@ proc handleCmd(v: View, s: string) =
           result = true
       if result:
         v.isOpen.incl g
-      if result:
-        g.bin = 5.Bin
     discard aux(v.root)
 
 
