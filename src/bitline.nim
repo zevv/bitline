@@ -63,7 +63,7 @@ proc addEvent(app: App, t: Time, key, ev, evdata: string) =
       g.events.add misc.Event(kind: ekSpan, data: evdata, ts: initSpan(t, NoTime), value: value)
     of '-':
       if g.events.len > 0:
-        g.events[^1].ts.v2 = t
+        g.events[^1].ts.hi = t
     of '!':
       g.events.add misc.Event(kind: ekOneshot, data: evdata, ts: initSpan(t, t), value: value)
     of 'c':

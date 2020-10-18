@@ -71,10 +71,10 @@ type
 # Helpers
 
 proc time2x(v: View, t: Time): int =
-  result = int((t - v.ts.v1) * v.pixelsPerSecond)
+  result = int((t - v.ts.lo) * v.pixelsPerSecond)
 
 proc x2time(v: View, x: int): Time =
-  v.ts.v1 + (x / v.w) * (v.ts.v2 - v.ts.v1)
+  v.ts.lo + (x / v.w) * (v.ts.hi - v.ts.lo)
 
 
 var C = 100.0
@@ -145,7 +145,7 @@ proc drawGrid(v: View) =
     v.setColor col
 
     if dtw > 5 and dtw < v.w.float:
-      while t < v.ts.v2:
+      while t < v.ts.hi:
         let x = v.time2x(t)
         if x > -80 and x < v.w:
           v.drawLine(x, y1, x, y4)
@@ -155,7 +155,7 @@ proc drawGrid(v: View) =
             v.drawText(x+2, y3, t.fromUnixFloat.utc.format(fmts2), col)
         t += dt
 
-  let t = v.ts.v1.fromUnixFloat.utc
+  let t = v.ts.lo.fromUnixFloat.utc
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()), 0.001, "mm:ss", "fff")
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()), 0.01, "mm:ss", "fff")
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()), 0.1, "mm:ss", "fff")
@@ -225,7 +225,7 @@ proc measure(v: View, group: Group): string =
   proc aux(g: Group) =
     for id, ev in g.events:
 
-      if ts1 < ev.ts.v1 and ts2 >= ev.ts.v2:
+      if ts1 < ev.ts.lo and ts2 >= ev.ts.hi:
         inc count
         if ev.value != NoValue:
           vMin = min(vMin, ev.value)
@@ -233,8 +233,8 @@ proc measure(v: View, group: Group): string =
           vTot += ev.value
           nTot += 1
 
-      let tsint1 = max(ts1, ev.ts.v1)
-      let tsint2 = min(ts2, ev.ts.v2)
+      let tsint1 = max(ts1, ev.ts.lo)
+      let tsint2 = min(ts2, ev.ts.hi)
       if tsint2 > tsint1:
         time += tsint2 - tsint1
 
@@ -263,7 +263,7 @@ proc measure(v: View, group: Group): string =
 proc drawData(v: View) =
 
   v.curGroup = nil
-  v.curEvent.ts.v1 = NoTime
+  v.curEvent.ts.lo = NoTime
 
   type Label = object
     text: string
@@ -282,16 +282,16 @@ proc drawData(v: View) =
     # precalulate stuff for v2y
 
 
-    let ppv = if g.vs.v1 != g.vs.v2: h.float / (g.vs.v2 - g.vs.v1) else: 0.0
-    let logMin = log(max(g.vs.v1, 1e-3), 10)
-    let logMax = log(max(g.vs.v2, 1e-3), 10)
+    let ppv = if g.vs.lo != g.vs.hi: h.float / (g.vs.hi - g.vs.lo) else: 0.0
+    let logMin = log(max(g.vs.lo, 1e-3), 10)
+    let logMax = log(max(g.vs.hi, 1e-3), 10)
     let ppvLog = h.float / (logMax - logMin)
 
     proc val2y(val: float): int =
       if gv.graphScale == gsLog:
         y + h - int((log(max(val, 1e-3), 10) - logMin) * ppvLog).clamp(0, h)
       else:
-        y + h - int((val - g.vs.v1) * ppv).clamp(0, h)
+        y + h - int((val - g.vs.lo) * ppv).clamp(0, h)
 
     # graph state
     var rects = newSeqOfCap[Rect](g.events.len)
@@ -305,8 +305,8 @@ proc drawData(v: View) =
     var nTot = 0
 
     # Binary search for event indices which lie in the current view
-    var i1 = g.events.lowerbound(v.ts.v1, (e, t) => cmp(if e.ts.v2 != NoTime: e.ts.v2 else: e.ts.v1, t))
-    var i2 = g.events.upperbound(v.ts.v2, (e, t) => cmp(e.ts.v1, t))
+    var i1 = g.events.lowerbound(v.ts.lo, (e, t) => cmp(if e.ts.hi != NoTime: e.ts.hi else: e.ts.lo, t))
+    var i2 = g.events.upperbound(v.ts.hi, (e, t) => cmp(e.ts.lo, t))
 
     if i1 > 0: dec i1
     if i2 < g.events.len: inc i2
@@ -316,11 +316,11 @@ proc drawData(v: View) =
 
       # Calculate x for event start and end time
       let e = g.events[i]
-      var x1 = v.time2x(e.ts.v1)
-      var x2 = if e.ts.v2 == NoTime or e.ts.v2 == e.ts.v1:
+      var x1 = v.time2x(e.ts.lo)
+      var x2 = if e.ts.hi == NoTime or e.ts.hi == e.ts.lo:
           x1 + 1 # Oneshot or incomplete span
         else:
-          max(v.time2x(e.ts.v2), x1+1)
+          max(v.time2x(e.ts.hi), x1+1)
 
       # Keep track of min, max and average of events with values
       if e.kind in { ekCounter, ekGauge }:
@@ -362,7 +362,7 @@ proc drawData(v: View) =
             vMax = Value.low
 
         # Incomplete span gets a little arrow
-        if e.ts.v2 == NoTime:
+        if e.ts.hi == NoTime:
           for i in 1..<h /% 2:
             rects.add Rect(x: x1+i, y: y+i, w: 1, h: h-i*2)
         
@@ -438,9 +438,9 @@ proc drawData(v: View) =
       var n = 0
       proc aux(g: Group) =
         if g.events.len > 0:
-          let ts1 = g.events[0].ts.v1
-          let ts2 = g.events[^1].ts.v2
-          if ts1 < v.ts.v2 and (ts2 == NoTime or ts2 > v.ts.v1):
+          let ts1 = g.events[0].ts.lo
+          let ts2 = g.events[^1].ts.hi
+          if ts1 < v.ts.hi and (ts2 == NoTime or ts2 > v.ts.lo):
             drawEvents(g, y, 1)
             inc y
             inc n
@@ -470,7 +470,7 @@ proc drawData(v: View) =
   # Draw evdata for current event
 
   let e = v.curEvent
-  if e.ts.v1 != NoTime and v.tMeasure == NoTime:
+  if e.ts.lo != NoTime and v.tMeasure == NoTime:
     if e.value != NoValue:
       labels.add Label(x: v.mouseX + 15, y: v.mouseY, text: e.value.siFmt, col: colEvent)
     elif e.data != "":
@@ -585,16 +585,16 @@ proc openAll*(v: View) =
 
 proc zoomX*(v: View, f: float) =
   let tm = v.x2time(v.mouseX)
-  v.ts.v1 = tm - (tm - v.ts.v1) * f
-  v.ts.v2 = tm + (v.ts.v2 - tm) * f
+  v.ts.lo = tm - (tm - v.ts.lo) * f
+  v.ts.hi = tm + (v.ts.hi - tm) * f
 
 proc panY*(v: View, dy: int) =
   v.yTop -= dy
 
 proc panX*(v: View, dx: int) =
-  let dt = (v.ts.v2 - v.ts.v1) / v.w.float * dx.float
-  v.ts.v1 = v.ts.v1 + dt
-  v.ts.v2 = v.ts.v2 + dt
+  let dt = (v.ts.hi - v.ts.lo) / v.w.float * dx.float
+  v.ts.lo = v.ts.lo + dt
+  v.ts.hi = v.ts.hi + dt
 
 proc getWindow*(v: View): Window =
   v.win
@@ -604,11 +604,11 @@ proc setTMeasure*(v: View, t: Time) =
 
 proc draw*(v: View, appStats: AppStats) =
 
-  if v.ts.v1 == 0.0 and v.ts.v2 == 1.0 and v.rootGroup.ts.v2 != NoTime:
+  if v.ts.lo == 0.0 and v.ts.hi == 1.0 and v.rootGroup.ts.hi != NoTime:
     v.ts = v.rootGroup.ts
 
   v.rowSize = v.rowSize.clamp(4, 128)
-  v.pixelsPerSecond = v.w.float / (v.ts.v2 - v.ts.v1)
+  v.pixelsPerSecond = v.w.float / (v.ts.hi - v.ts.lo)
 
   let t1 = cpuTime()
 
@@ -709,7 +709,7 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.showGui = true
         of sdl.K_a:
           v.yTop = 0
-          if v.rootGroup.ts.v1 != NoTime and v.rootGroup.ts.v2 != NoTime:
+          if v.rootGroup.ts.lo != NoTime and v.rootGroup.ts.hi != NoTime:
             v.ts = v.rootGroup.ts
         of sdl.K_c:
           v.closeAll()
@@ -812,9 +812,9 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         if b == sdl.BUTTON_RIGHT:
           if v.curGroup != nil:
             v.groupView(v.curGroup).isOpen = true
-            let dt = v.curGroup.ts.v2 - v.curGroup.ts.v1
-            v.ts.v1 = v.curGroup.ts.v1 - (dt / 5)
-            v.ts.v2 = v.curGroup.ts.v2 + (dt / 20)
+            let dt = v.curGroup.ts.hi - v.curGroup.ts.lo
+            v.ts.lo = v.curGroup.ts.lo - (dt / 5)
+            v.ts.hi = v.curGroup.ts.hi + (dt / 20)
 
       if b == sdl.BUTTON_MIDDLE:
         v.tMeasure = NoTime

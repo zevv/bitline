@@ -17,7 +17,7 @@ type
   Time* = float64
 
   Span*[T] = object
-    v1*, v2*: T
+    lo*, hi*: T
 
   TimeSpan* = Span[Time]
 
@@ -91,29 +91,29 @@ proc siFmt*(v: SomeNumber, unit="", align=false): string =
   else:
     format(1e-9, "G")
 
-proc initSpan*[T](v1:T=T.high, v2:T=T.low): Span[T] =
-  Span[T](v1: v1, v2: v2)
+proc initSpan*[T](lo:T=T.high, hi:T=T.low): Span[T] =
+  Span[T](lo: lo, hi: hi)
 
 proc incl*[T](s: var Span[T], v: T) =
-  s.v1 = min(s.v1, v)
-  s.v2 = max(s.v2, v)
+  s.lo = min(s.lo, v)
+  s.hi = max(s.hi, v)
 
 proc incl*[T](s: var Span[T], v: Span[T]) =
-  s.v1 = min(s.v1, v.v1)
-  if v.v2 != T.low:
-    s.v2 = max(s.v2, v.v2)
+  s.lo = min(s.lo, v.lo)
+  if v.hi != T.low:
+    s.hi = max(s.hi, v.hi)
   else:
-    s.v2 = max(s.v2, v.v1)
+    s.hi = max(s.hi, v.lo)
 
 proc duration*(ts: TimeSpan): float =
-  ts.v2 - ts.v1
+  ts.hi - ts.lo
 
 
 proc contains*[T](s: Span[T], v: T): bool =
-  v >= s.v1 and v <= s.v2
+  v >= s.lo and v <= s.hi
 
 proc overlaps*[T](s1: Span[T], s2: Span[T]): bool =
-  s1.v1 <= s2.v2 and s1.v2 >= s2.v1 
+  s1.lo <= s2.hi and s1.hi >= s2.lo 
 
 proc fmtDuration*(d: Time): string =
   let d = abs(d)
