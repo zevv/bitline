@@ -28,9 +28,14 @@ const
 
 type
 
+  GroupView = ref object
+    height: int
+    logScale: bool
+    isOpen: bool
+
   View* = ref object
     ts: TimeSpan
-    root: Group
+    rootGroup: Group
     pixelsPerSecond: float
     tMeasure: Time
     ytop: int
@@ -42,8 +47,6 @@ type
     dragButton: int
     dragged: int
     gui: Gui
-    isOpen: HashSet[Group]
-    groupScale: Table[Group, int]
     curGroup: Group
     curEvent: Event
     stats: ViewStats
@@ -53,6 +56,7 @@ type
     textCache: TextCache
     cmdLine: CmdLine
     hideBin: set[Bin]
+    groupViews: Table[Group, GroupView]
   
   CmdLine = ref object
     active: bool
@@ -81,6 +85,12 @@ proc color(bin: Bin): Color =
 
 proc color(g: Group): Color =
   g.bin.color()
+   
+proc groupView(v: View, g: Group): GroupView =
+  if g != nil:
+    result = v.groupViews.mgetOrPut(g, GroupView())
+
+proc toggle(v: var bool) = v = not v
 
 # Drawing primitives
 
@@ -207,6 +217,8 @@ proc measure(v: View, group: Group): string =
   var time = 0.0
   var vMin = Value.high
   var vMax = Value.low
+  var vTot = 0.0
+  var nTot = 0
 
   proc aux(g: Group) =
     for id, ev in g.events:
@@ -216,6 +228,8 @@ proc measure(v: View, group: Group): string =
         if ev.value != NoValue:
           vMin = min(vMin, ev.value)
           vMax = max(vMax, ev.value)
+          vTot += ev.value
+          nTot += 1
 
       let tsint1 = max(ts1, ev.ts.v1)
       let tsint2 = min(ts2, ev.ts.v2)
@@ -239,7 +253,7 @@ proc measure(v: View, group: Group): string =
   if vMin != Value.high:
     parts.add "min=" & siFmt(vMin)
     parts.add "max=" & siFmt(vMax)
-    parts.add "avg=" & siFmt((vMin + vMax) / 2)
+    parts.add "avg=" & siFmt(vTot / nTot.float)
 
   result.add parts.join(", ")
 
@@ -264,13 +278,24 @@ proc drawData(v: View) =
     var rects = newSeqOfCap[Rect](g.events.len)
     var graphRects = newSeqOfCap[Rect](g.events.len)
     var points: seq[Point]
-    var xprev = int.low
+    var prevX = int.low
     
     var vMin = Value.high
     var vMax = Value.low
+    var vTot = 0.Value
+    var nTot = 0
 
     let pixelsPerValue = if g.vs.v1 != g.vs.v2: h.float / (g.vs.v2 - g.vs.v1) else: 0.0
-    proc v2y(v: float): int = y + h - int((v - g.vs.v1) * pixelsPerValue).clamp(0, h)
+
+    let logMin = log(max(g.vs.v1, 1e-3), 10)
+    let logMax = log(max(g.vs.v2, 1e-3), 10)
+    let pixelsPerValueLog = h.float / (logMax - logMin)
+
+    proc val2y(val: float):int =
+      if v.groupView(g).logScale:
+        y + h - int((log(max(val, 1e-3), 10) - logMin) * pixelsPerValueLog).clamp(0, h)
+      else:
+        y + h - int((val - g.vs.v1) * pixelsPerValue).clamp(0, h)
 
     # Binary search for event indices which lie in the current view
     var i1 = g.events.lowerbound(v.ts.v1, (e, t) => cmp(if e.ts.v2 != NoTime: e.ts.v2 else: e.ts.v1, t))
@@ -279,6 +304,7 @@ proc drawData(v: View) =
     if i1 > 0: dec i1
     if i2 < g.events.len: inc i2
 
+    echo ""
     # Iterate visible events
     for i in i1 ..< i2:
 
@@ -290,37 +316,46 @@ proc drawData(v: View) =
         else:
           max(v.time2x(e.ts.v2), x1+1)
 
-      # Keep track of min and max of events with values
-      if e.value != NoValue:
+      # Keep track of min, max and average of events with values
+      if e.kind in { ekCounter, ekGauge }:
         vMin = min(vMin, e.value)
         vMax = max(vMax, e.value)
+        vTot += e.value
+        inc nTot
+
+      echo "  ", x1, " ", e.ts.v1
 
       # Only draw this event if it gets drawn on a different pixel then the
       # previous event
-      if x2 > xprev:
+      if x2 > prevX:
 
         # Never overlap over previous events
-        x1 = max(x1, xprev)
+        x1 = max(x1, prevX)
 
-        if e.value == NoValue:
-          # Draw event bar
-          rects.add Rect(x: x1, y: y, w: x2-x1, h: h)
-        else:
-          # Events with a value get graphed
-          var (y0, y1, y2) = (0.v2y, vMax.v2y, vMin.v2y)
-          points.add Point(x: x1, y: (y1+y2) div 2)
+        case e.kind
 
-          assert y1 <= y2
-          if y1 < y0 and y2 < y0:
-            y1 = min(y1, y2)
-            y2 = y0
-          if y1 > y0 and y2 > y0:
-            y1 = y0
-            y2 = max(y1, y2)
-          graphRects.add Rect(x: x1, y: y1, w: x2-x1, h: y2-y1)
+          of ekOneshot, ekSpan:
+            # Draw event bar
+            rects.add Rect(x: x1, y: y, w: x2-x1, h: h)
 
-          vmin = Value.high
-          vMax = Value.low
+          of ekCounter, ekGauge:
+            # Events with a value get graphed
+            let vAvg = vTot / nTot.float
+            (vTot, nTot) = (0.0, 0)
+            var (y, y0, yMax, yMin) = (vAvg.val2y, 0.val2y, vMax.val2y, vMin.val2y)
+            points.add Point(x: x1, y: y)
+
+            assert yMax <= yMin
+            if yMax < y0 and yMin < y0:
+              yMax = min(yMax, yMin)
+              yMin = y0
+            if yMax > y0 and yMin > y0:
+              yMax = y0
+              yMin = max(yMax, yMin)
+            graphRects.add Rect(x: x1, y: yMax, w: x2-x1, h: yMin-yMax)
+
+            vmin = Value.high
+            vMax = Value.low
 
         # Incomplete span gets a little arrow
         if e.ts.v2 == NoTime:
@@ -333,7 +368,7 @@ proc drawData(v: View) =
 
         # Always leave a gap of 1 pixel between event, this makese sure gaps do
         # not go unnoticed, on any zoom level
-        xprev = x2 + 1
+        prevX = x2 + 1
 
     var col = g.color
     v.setColor(col)
@@ -360,7 +395,7 @@ proc drawData(v: View) =
 
   proc drawGroup(g: Group, depth: int) =
 
-    if g != v.root and g.bin in v.hideBin:
+    if g != v.rootGroup and g.bin in v.hideBin:
       for id, cg in g.groups:
         drawGroup(cg, depth+1)
       return
@@ -368,10 +403,10 @@ proc drawData(v: View) =
     if not v.ts.overlaps(g.ts):
       return
 
-    let isOpen = g in v.isOpen
+    let gv = v.groupView(g)
+    let isOpen = gv.isOpen
     let yGroup = y
-    let scale = 1 shl v.groupScale.getOrDefault(g, 0)
-    let rowSize = v.rowSize * scale
+    let rowSize = v.rowSize * pow(1.5, gv.height.float).int
 
     # Horizontal separator
     v.setColor(colGrid)
@@ -426,7 +461,7 @@ proc drawData(v: View) =
 
   # Recursively draw all groups
 
-  drawGroup(v.root, 0)
+  drawGroup(v.rootGroup, 0)
 
   # Draw evdata for current event
 
@@ -505,7 +540,7 @@ proc drawGui(v: View) =
 
 
 
-proc newView*(root: Group, w, h: int): View =
+proc newView*(rootGroup: Group, w, h: int): View =
   let v = View()
 
   v.win = createWindow("events",
@@ -519,12 +554,15 @@ proc newView*(root: Group, w, h: int): View =
 
   v.w = w
   v.h = h
-  v.root = root
+  v.rootGroup = rootGroup
   v.gui = newGui(v.rend, v.textcache)
   v.ts = initSpan[Time](0.0, 1.0)
   v.rowSize = 12
   v.lineSpacing = 3
-  v.isOpen.incl root
+
+  v.groupView(rootGroup).isOpen = true
+  echo v.groupView(rootGroup)[]
+
   v.tMeasure = NoTime
   v.cmdLine = CmdLine()
 
@@ -532,14 +570,14 @@ proc newView*(root: Group, w, h: int): View =
 
 
 proc closeAll*(v: View) =
-  v.isOpen.clear
+  v.groupViews.clear
 
 proc openAll*(v: View) =
   proc aux(g: Group) =
-    v.isOpen.incl g
+    v.groupView(g).isOpen = true
     for id, cg in g.groups:
       aux(cg)
-  aux(v.root)
+  aux(v.rootGroup)
 
 proc zoomX*(v: View, f: float) =
   let tm = v.x2time(v.mouseX)
@@ -562,8 +600,8 @@ proc setTMeasure*(v: View, t: Time) =
 
 proc draw*(v: View, appStats: AppStats) =
 
-  if v.ts.v1 == 0.0 and v.ts.v2 == 1.0 and v.root.ts.v2 != NoTime:
-    v.ts = v.root.ts
+  if v.ts.v1 == 0.0 and v.ts.v2 == 1.0 and v.rootGroup.ts.v2 != NoTime:
+    v.ts = v.rootGroup.ts
 
   v.rowSize = v.rowSize.clamp(4, 128)
   v.pixelsPerSecond = v.w.float / (v.ts.v2 - v.ts.v1)
@@ -604,8 +642,8 @@ proc handleCmd(v: View, s: string) =
         if aux(gc):
           result = true
       if result:
-        v.isOpen.incl g
-    discard aux(v.root)
+        v.groupView(g).isOpen = true
+    discard aux(v.rootGroup)
 
 
 proc setBin(g: Group, bin: Bin) =
@@ -667,8 +705,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.showGui = true
         of sdl.K_a:
           v.yTop = 0
-          if v.root.ts.v1 != NoTime and v.root.ts.v2 != NoTime:
-            v.ts = v.root.ts
+          if v.rootGroup.ts.v1 != NoTime and v.rootGroup.ts.v2 != NoTime:
+            v.ts = v.rootGroup.ts
         of sdl.K_c:
           v.closeAll()
         of sdl.K_o:
@@ -697,6 +735,9 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.yTop -= 50
         of sdl.K_h:
           discard sdl.showSimpleMessageBox(0, "help", usage(), v.getWindow());
+        of sdl.K_l:
+          if v.curGroup != nil:
+            v.groupView(v.curGroup).logScale.toggle
         else:
           discard
 
@@ -756,15 +797,16 @@ proc sdlEvent*(v: View, e: sdl.Event) =
 
         if b == sdl.BUTTON_Left:
           if v.curGroup != nil:
-            if v.curGroup in v.isOpen:
-              v.isOpen.excl v.curGroup
+            if v.groupView(v.curGroup).isOpen:
+              v.groupView(v.curGroup).isOpen = false
             else:
               if v.curGroup.groups.len > 0:
-                v.isOpen.incl v.curGroup
+                echo "opened"
+                v.groupView(v.curGroup).isOpen = true
 
         if b == sdl.BUTTON_RIGHT:
           if v.curGroup != nil:
-            v.isOpen.incl v.curGroup
+            v.groupView(v.curGroup).isOpen = true
             let dt = v.curGroup.ts.v2 - v.curGroup.ts.v1
             v.ts.v1 = v.curGroup.ts.v1 - (dt / 5)
             v.ts.v2 = v.curGroup.ts.v2 + (dt / 20)
@@ -774,9 +816,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
 
     of sdl.MouseWheel:
       if v.curGroup != nil:
-        let h = v.groupScale.mgetOrPut(v.curGroup, 0)
-        inc v.groupScale[v.curGroup], e.wheel.y
-        v.groupScale[v.curGroup] = v.groupScale[v.curGroup].clamp(0, 6)
+        let gv = v.groupView(v.curGroup)
+        gv.height = (gv.height + e.wheel.y).clamp(0, 10)
 
     of sdl.WindowEvent:
       if e.window.event == sdl.WINDOWEVENT_RESIZED:

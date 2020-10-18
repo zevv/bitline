@@ -13,6 +13,7 @@ proc usage*(): string = """
 keys:
  a             zoom all
  c /o          close all / open all
+ l             toggle log scale for graphs"
  q             quit
  [ / ]         adjust alpha
  + / -         adjust font size

@@ -33,8 +33,17 @@ type
     groups*: OrderedTable[string, Group]
     events*: seq[Event]
     bin*: Bin
+    prevTotal*: Value
+    prevTime*: Time
+
+  EventKind* = enum
+    ekOneshot,
+    ekSpan,
+    ekCounter,
+    ekGauge,
 
   Event* = object
+    kind*: EventKind
     ts*: TimeSpan
     data*: string
     value*: Value
@@ -125,4 +134,6 @@ proc newGroup*(parent: Group=nil, id="", bin=1): Group =
     bin: bin,
     ts: initSpan[Time](),
     vs: initSpan[Value](),
+    prevTime: NoTime,
+    prevTotal: NoValue,
   )
