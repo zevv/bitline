@@ -285,13 +285,11 @@ proc drawData(v: View) =
     let ppv = if g.vs.v1 != g.vs.v2: h.float / (g.vs.v2 - g.vs.v1) else: 0.0
     let logMin = log(max(g.vs.v1, 1e-3), 10)
     let logMax = log(max(g.vs.v2, 1e-3), 10)
-    let pixelsPerValueLog = h.float / (logMax - logMin)
+    let ppvLog = h.float / (logMax - logMin)
 
-    let gv = v.groupView(g)
-
-    proc val2y(val: float):int =
+    proc val2y(val: float): int =
       if gv.graphScale == gsLog:
-        y + h - int((log(max(val, 1e-3), 10) - logMin) * pixelsPerValueLog).clamp(0, h)
+        y + h - int((log(max(val, 1e-3), 10) - logMin) * ppvLog).clamp(0, h)
       else:
         y + h - int((val - g.vs.v1) * ppv).clamp(0, h)
 
