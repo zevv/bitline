@@ -34,6 +34,7 @@ type
     height: int
     graphScale: GraphScale
     isOpen: bool
+    bin*: Bin
 
   View* = ref object
     ts: TimeSpan
@@ -68,7 +69,11 @@ type
     renderTime: float
 
 
-# Helpers
+# Misc helpers
+
+proc groupView(v: View, g: Group): GroupView =
+  if g != nil:
+    result = v.groupViews.mgetOrPut(g, GroupView(bin: 1))
 
 proc time2x(v: View, t: Time): int =
   result = int((t - v.ts.lo) * v.pixelsPerSecond)
@@ -81,12 +86,9 @@ proc color(bin: Bin): Color =
   let col = chroma.ColorPolarLUV(h: hue, c: 100.0, l: 70.0).color()
   Color(r: (col.r * 255).uint8, g: (col.g * 255).uint8, b: (col.b * 255).uint8, a: 255.uint8)
 
-proc color(g: Group): Color =
-  g.bin.color()
-
-proc groupView(v: View, g: Group): GroupView =
-  if g != nil:
-    result = v.groupViews.mgetOrPut(g, GroupView())
+proc groupColor(v: View, g: Group): Color =
+  let gv = v.groupView(g)
+  gv.bin.color()
 
 # Drawing primitives
 
@@ -360,7 +362,7 @@ proc drawData(v: View) =
         if e.ts.hi == NoTime:
           for i in 1..<h /% 2:
             rects.add Rect(x: x1+i, y: y+i, w: 1, h: h-i*2)
-        
+
         # Check for hovering
         if initSpan(y, y+h).contains(v.mouseY) and initSpan(x1, x2).contains(v.mouseX):
           v.curEvent = e
@@ -369,15 +371,15 @@ proc drawData(v: View) =
         # not go unnoticed, on any zoom level
         prevX = x2 + 1
 
-    var col = g.color
+    var col = v.groupColor(g)
     v.setColor(col)
 
     # Render all event rectangles
     if rects.len > 0:
       discard v.rend.renderFillRects(rects[0].addr, rects.len)
-    
+
     # Render graph events and lines
- 
+
     if points.len > 0:
       discard v.rend.renderDrawLines(points[0].addr, points.len)
 
@@ -394,7 +396,9 @@ proc drawData(v: View) =
 
   proc drawGroup(g: Group, depth: int) =
 
-    if g != v.rootGroup and g.bin in v.hideBin:
+    let gv = v.groupView(g)
+
+    if g != v.rootGroup and gv.bin in v.hideBin:
       for id, cg in g.groups:
         drawGroup(cg, depth+1)
       return
@@ -402,7 +406,6 @@ proc drawData(v: View) =
     if not v.ts.overlaps(g.ts):
       return
 
-    let gv = v.groupView(g)
     let isOpen = gv.isOpen
     let yGroup = y
     let rowSize = v.rowSize * pow(1.5, gv.height.float).int
@@ -413,7 +416,7 @@ proc drawData(v: View) =
 
     # Draw label and events for this group
     var h = 0
-    var c = g.color()
+    var c = v.groupColor(g)
     var arrow = ""
     if g.groups.len > 0:
       arrow = if isOpen: "▼ " else: "▶ "
@@ -645,9 +648,10 @@ proc handleCmd(v: View, s: string) =
     discard aux(v.rootGroup)
 
 
-proc setBin(g: Group, bin: Bin) =
+proc setBin(v:View, g: Group, bin: Bin) =
   proc aux(g: Group) =
-    g.bin = bin
+    let gv = v.groupView(g)
+    gv.bin = bin
     for _, cg in g.groups:
       aux(cg)
   aux(g)
@@ -719,7 +723,7 @@ proc sdlEvent*(v: View, e: sdl.Event) =
               v.hideBin.incl bin
           else:
             if v.curGroup != nil:
-              v.curGroup.setBin bin
+              setBin(v, v.curGroup, bin)
         of sdl.K_COMMA:
           v.zoomX 1.0/0.9
         of sdl.K_PERIOD:

@@ -32,7 +32,6 @@ type
     vs*: ValueSpan
     groups*: OrderedTable[string, Group]
     events*: seq[Event]
-    bin*: Bin
     prevTotal*: Value
     prevTime*: Time
 
@@ -113,7 +112,7 @@ proc contains*[T](s: Span[T], v: T): bool =
   v >= s.lo and v <= s.hi
 
 proc overlaps*[T](s1: Span[T], s2: Span[T]): bool =
-  s1.lo <= s2.hi and s1.hi >= s2.lo 
+  s1.lo <= s2.hi and s1.hi >= s2.lo
 
 proc fmtDuration*(d: Time): string =
   let d = abs(d)
@@ -127,11 +126,10 @@ proc fmtDuration*(d: Time): string =
 proc fmtFrequency*(f: float): string =
   siFmt(f, "Hz")
 
-proc newGroup*(parent: Group=nil, id="", bin=1): Group =
+proc newGroup*(parent: Group=nil, id=""): Group =
   Group(
     parent: parent,
     id: id,
-    bin: bin,
     ts: initSpan[Time](),
     vs: initSpan[Value](),
     prevTime: NoTime,

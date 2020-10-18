@@ -21,7 +21,6 @@ type
     gidCache: Table[string, Group]
     stats: AppStats
     readers: seq[Reader]
-    binSeq: Bin
 
 
 proc keyToGroup(app: App, key: string): Group =
@@ -34,13 +33,6 @@ proc keyToGroup(app: App, key: string): Group =
       if id notin g.groups:
         g.groups[id] = g.newGroup(id)
         g = g.groups[id]
-        if g.parent == app.root:
-          g.bin = app.binSeq
-          inc app.binSeq
-          if app.binSeq == Bin.high:
-            app.binSeq = Bin.low
-        else:
-          g.bin = g.parent.bin
       else:
         g = g.groups[id]
       app.gidCache[key] = g
@@ -197,7 +189,6 @@ proc newApp*(w, h: int): App =
 
   let app = App(
     root: newGroup(),
-    binSeq: Bin(1),
   )
 
   let v = newView(app.root, w, h)
