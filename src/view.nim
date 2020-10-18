@@ -59,7 +59,7 @@ type
     cmdLine: CmdLine
     hideBin: set[Bin]
     groupViews: Table[Group, GroupView]
-  
+
   CmdLine = ref object
     active: bool
     s: string
@@ -76,23 +76,17 @@ proc time2x(v: View, t: Time): int =
 proc x2time(v: View, x: int): Time =
   v.ts.lo + (x / v.w) * (v.ts.hi - v.ts.lo)
 
-
-var C = 100.0
-var L =  70.0
-
 proc color(bin: Bin): Color =
   let hue = bin.float / 9.0 * 360 + 160
-  let col = chroma.ColorPolarLUV(h: hue, c: C, l: L).color()
+  let col = chroma.ColorPolarLUV(h: hue, c: 100.0, l: 70.0).color()
   Color(r: (col.r * 255).uint8, g: (col.g * 255).uint8, b: (col.b * 255).uint8, a: 255.uint8)
 
 proc color(g: Group): Color =
   g.bin.color()
-   
+
 proc groupView(v: View, g: Group): GroupView =
   if g != nil:
     result = v.groupViews.mgetOrPut(g, GroupView())
-
-proc toggle(v: var bool) = v = not v
 
 # Drawing primitives
 
@@ -277,15 +271,14 @@ proc drawData(v: View) =
 
   proc drawEvents(g: Group, y: int, h: int) =
 
-    let gv = v.groupView(g)
+    # precalulate stuff for value-to-y calculations
 
-    # precalulate stuff for v2y
-
-
-    let ppv = if g.vs.lo != g.vs.hi: h.float / (g.vs.hi - g.vs.lo) else: 0.0
-    let logMin = log(max(g.vs.lo, 1e-3), 10)
-    let logMax = log(max(g.vs.hi, 1e-3), 10)
-    let ppvLog = h.float / (logMax - logMin)
+    let
+      gv = v.groupView(g)
+      ppv = if g.vs.lo != g.vs.hi: h.float / (g.vs.hi - g.vs.lo) else: 0.0
+      logMin = log(max(g.vs.lo, 1e-3), 10)
+      logMax = log(max(g.vs.hi, 1e-3), 10)
+      ppvLog = h.float / (logMax - logMin)
 
     proc val2y(val: float): int =
       if gv.graphScale == gsLog:
@@ -294,15 +287,16 @@ proc drawData(v: View) =
         y + h - int((val - g.vs.lo) * ppv).clamp(0, h)
 
     # graph state
-    var rects = newSeqOfCap[Rect](g.events.len)
-    var graphRects = newSeqOfCap[Rect](g.events.len)
-    var points: seq[Point]
-    var prevX = int.low
-    
-    var vMin = Value.high
-    var vMax = Value.low
-    var vTot = 0.Value
-    var nTot = 0
+    var
+      rects = newSeqOfCap[Rect](g.events.len)
+      graphRects = newSeqOfCap[Rect](g.events.len)
+      points: seq[Point]
+      prevX = int.low
+
+      vMin = Value.high
+      vMax = Value.low
+      vTot = 0.Value
+      nTot = 0
 
     # Binary search for event indices which lie in the current view
     var i1 = g.events.lowerbound(v.ts.lo, (e, t) => cmp(if e.ts.hi != NoTime: e.ts.hi else: e.ts.lo, t))
@@ -314,8 +308,9 @@ proc drawData(v: View) =
     # Iterate visible events
     for i in i1 ..< i2:
 
-      # Calculate x for event start and end time
       let e = g.events[i]
+
+      # Calculate x for event start and end time
       var x1 = v.time2x(e.ts.lo)
       var x2 = if e.ts.hi == NoTime or e.ts.hi == e.ts.lo:
           x1 + 1 # Oneshot or incomplete span
@@ -536,8 +531,8 @@ proc drawGui(v: View) =
   v.gui.start(0, 0)
   v.gui.start(PackVer)
 
-  discard v.gui.slider("C", C, 0, 100, true)
-  discard v.gui.slider("L", L, 0, 100, true)
+  #discard v.gui.slider("C", C, 0, 100, true)
+  #discard v.gui.slider("L", L, 0, 100, true)
 
   v.gui.stop()
   v.gui.stop()
