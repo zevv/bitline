@@ -277,18 +277,12 @@ proc drawData(v: View) =
 
   proc drawEvents(g: Group, y: int, h: int) =
 
-    var rects = newSeqOfCap[Rect](g.events.len)
-    var graphRects = newSeqOfCap[Rect](g.events.len)
-    var points: seq[Point]
-    var prevX = int.low
-    
-    var vMin = Value.high
-    var vMax = Value.low
-    var vTot = 0.Value
-    var nTot = 0
+    let gv = v.groupView(g)
 
-    let pixelsPerValue = if g.vs.v1 != g.vs.v2: h.float / (g.vs.v2 - g.vs.v1) else: 0.0
+    # precalulate stuff for v2y
 
+
+    let ppv = if g.vs.v1 != g.vs.v2: h.float / (g.vs.v2 - g.vs.v1) else: 0.0
     let logMin = log(max(g.vs.v1, 1e-3), 10)
     let logMax = log(max(g.vs.v2, 1e-3), 10)
     let pixelsPerValueLog = h.float / (logMax - logMin)
@@ -299,7 +293,18 @@ proc drawData(v: View) =
       if gv.graphScale == gsLog:
         y + h - int((log(max(val, 1e-3), 10) - logMin) * pixelsPerValueLog).clamp(0, h)
       else:
-        y + h - int((val - g.vs.v1) * pixelsPerValue).clamp(0, h)
+        y + h - int((val - g.vs.v1) * ppv).clamp(0, h)
+
+    # graph state
+    var rects = newSeqOfCap[Rect](g.events.len)
+    var graphRects = newSeqOfCap[Rect](g.events.len)
+    var points: seq[Point]
+    var prevX = int.low
+    
+    var vMin = Value.high
+    var vMax = Value.low
+    var vTot = 0.Value
+    var nTot = 0
 
     # Binary search for event indices which lie in the current view
     var i1 = g.events.lowerbound(v.ts.v1, (e, t) => cmp(if e.ts.v2 != NoTime: e.ts.v2 else: e.ts.v1, t))
