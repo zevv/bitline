@@ -28,9 +28,11 @@ const
 
 type
 
+  GraphScale = enum gsLin, gsLog
+
   GroupView = ref object
     height: int
-    logScale: bool
+    graphScale: GraphScale
     isOpen: bool
 
   View* = ref object
@@ -291,8 +293,10 @@ proc drawData(v: View) =
     let logMax = log(max(g.vs.v2, 1e-3), 10)
     let pixelsPerValueLog = h.float / (logMax - logMin)
 
+    let gv = v.groupView(g)
+
     proc val2y(val: float):int =
-      if v.groupView(g).logScale:
+      if gv.graphScale == gsLog:
         y + h - int((log(max(val, 1e-3), 10) - logMin) * pixelsPerValueLog).clamp(0, h)
       else:
         y + h - int((val - g.vs.v1) * pixelsPerValue).clamp(0, h)
@@ -304,7 +308,6 @@ proc drawData(v: View) =
     if i1 > 0: dec i1
     if i2 < g.events.len: inc i2
 
-    echo ""
     # Iterate visible events
     for i in i1 ..< i2:
 
@@ -322,8 +325,6 @@ proc drawData(v: View) =
         vMax = max(vMax, e.value)
         vTot += e.value
         inc nTot
-
-      echo "  ", x1, " ", e.ts.v1
 
       # Only draw this event if it gets drawn on a different pixel then the
       # previous event
@@ -737,7 +738,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           discard sdl.showSimpleMessageBox(0, "help", usage(), v.getWindow());
         of sdl.K_l:
           if v.curGroup != nil:
-            v.groupView(v.curGroup).logScale.toggle
+            let gv = v.groupView(v.curGroup)
+            gv.graphScale = if gv.graphScale == gsLin: gsLog else: gsLin
         else:
           discard
 
