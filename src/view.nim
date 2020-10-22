@@ -215,8 +215,6 @@ proc measure(v: View, group: Group): string =
   var time = 0.0
   var vMin = Value.high
   var vMax = Value.low
-  var vTot = 0.0
-  var nTot = 0
 
   proc aux(g: Group) =
     for id, ev in g.events:
@@ -226,8 +224,6 @@ proc measure(v: View, group: Group): string =
         if ev.value != NoValue:
           vMin = min(vMin, ev.value)
           vMax = max(vMax, ev.value)
-          vTot += ev.value
-          nTot += 1
 
       let tsint1 = max(ts1, ev.ts.lo)
       let tsint2 = min(ts2, ev.ts.hi)
@@ -251,7 +247,6 @@ proc measure(v: View, group: Group): string =
   if vMin != Value.high:
     parts.add "min=" & siFmt(vMin)
     parts.add "max=" & siFmt(vMax)
-    parts.add "avg=" & siFmt(vTot / nTot.float)
 
   result.add parts.join(", ")
 

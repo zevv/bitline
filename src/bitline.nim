@@ -71,7 +71,7 @@ proc addEvent(app: App, t: Time, key, ev, evdata: string) =
         g.prevTotal = total
       g.prevTime = t
 
-    of 'g':
+    of 'g', 'v':
       g.events.add misc.Event(kind: ekGauge, data: evdata, ts: initSpan(t, t), value: value)
       g.vs.incl value
     else:

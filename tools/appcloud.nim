@@ -40,20 +40,19 @@ for l in lines(stdin):
 
     let tsf = ts.fromUnixFloat().format("yyyy-MM-dd'T'HH:mm:ss'.'ffffff'Z'")
 
-    let p = tsf & " " & oid & "." & cid & "." & sid & "."
 
     if et == "session-launch-complete":
-      echo p & "session +"
+      echo tsf & " + " & oid & "." & cid & "." & sid & ".session"
     elif et == "session-stop":
-      echo p & "session -"
+      echo tsf & " - " & oid & "." & cid & "." & sid & ".session"
     elif et == "av-segment-downloaded":
       let d = j["serverdownloadduration"].getFloat()
       let ts2 = ts - d
       let tsf2 = ts2.fromUnixFloat().format("yyyy-MM-dd'T'HH:mm:ss'.'ffffff'Z'")
-      echo tsf2, " ", oid, ".", cid, ".", sid, ".av-segment-downloaded +"
-      echo tsf,  " ", oid, ".", cid, ".", sid, ".av-segment-downloaded -"
+      echo tsf2, " + ", oid, ".", cid, ".", sid, ".av-segment-downloaded"
+      echo tsf,  " - ", oid, ".", cid, ".", sid, ".av-segment-downloaded"
     else:
-      echo p & et & " " & "!"
+      let p = tsf & " ! " & oid & "." & cid & "." & sid & "." & et
 
     #echo j.repr
 

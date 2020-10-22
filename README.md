@@ -13,7 +13,7 @@ Bitline is written in [Nim](https://nim-lang.org/) and uses SDL2 and SDL2-ttf.
 
 ```
 nimble install sdl2_nim chroma
-make
+nimble build
 ```
 
 ## Usage
