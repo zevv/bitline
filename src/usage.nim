@@ -36,7 +36,8 @@ usage: bitline [options] [FILE...]
 
 options:
 
-  -h, --help      display this help and exit
-  -v, --version   output version information and exit
+  -h, --help          display this help and exit
+  -s, --session FILE  use FILE for saving/loading session state
+  -v, --version       output version information and exit
 
 """ & usageVersion()

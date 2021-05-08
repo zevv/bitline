@@ -186,14 +186,15 @@ proc run*(app: App): bool =
       sleep 10
 
 
-proc newApp*(w, h: int): App =
+proc newApp*(w, h: int, path_session: string): App =
 
   let app = App(
     root: newGroup(),
   )
 
-  let v = newView(app.root, w, h)
+  let v = newView(app.root, w, h, path_session)
   app.views[sdl.getWindowId(v.getWindow())] = v
+
   return app
   
 
@@ -217,6 +218,7 @@ proc addReader(app: App, fname: string) =
 proc main() =
 
   var sources: seq[string]
+  var opt_path_session = "~/.bitlinerc"
 
   var p = initOptParser()
   while true:
@@ -230,6 +232,8 @@ proc main() =
       of "help", "h":
         echo usageCmdline()
         quit(0)
+      of "session", "s":
+        opt_path_session = p.val
       of "version", "v":
         echo usageVersion()
         quit(0)
@@ -239,7 +243,7 @@ proc main() =
       break
 
   discard sdl.init(sdl.InitVideo or sdl.InitAudio)
-  let app = newApp(600, 400)
+  let app = newApp(600, 400, opt_path_session)
 
   for fname in commandLineParams():
     app.addReader(fname)

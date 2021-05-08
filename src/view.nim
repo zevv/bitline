@@ -47,6 +47,7 @@ type
 
   View* = ref object
     cfg: ViewConfig
+    cfgPath: string
     rootGroup: Group
     pixelsPerSecond: float
     tMeasure: Time
@@ -222,6 +223,7 @@ proc measure(v: View, group: Group): string =
   var vMax = Value.low
 
   proc aux(g: Group) =
+    let gv = v.groupView(g)
     for id, ev in g.events:
 
       if ts1 < ev.ts.lo and ts2 >= ev.ts.hi:
@@ -235,8 +237,9 @@ proc measure(v: View, group: Group): string =
       if tsint2 > tsint1:
         time += tsint2 - tsint1
 
-    for id, cg in g.groups:
-      aux(cg)
+    if not gv.isOpen:
+      for id, cg in g.groups:
+        aux(cg)
 
   aux(group)
 
@@ -442,8 +445,8 @@ proc drawData(v: View) =
           let ts1 = g.events[0].ts.lo
           let ts2 = g.events[^1].ts.hi
           if ts1 < v.cfg.ts.hi and (ts2 == NoTime or ts2 > v.cfg.ts.lo):
-            drawEvents(g, y, 2)
-            inc y, 3
+            drawEvents(g, y, 1)
+            inc y, 2
             inc n
         if n < rowSize:
           for id, cg in g.groups:
@@ -545,8 +548,13 @@ proc drawGui(v: View) =
 
 proc load*(v: View, fname: string)
 
-proc newView*(rootGroup: Group, w, h: int): View =
-  let v = View()
+proc newView*(rootGroup: Group, w, h: int, cfgPath: string): View =
+  let v = View(
+    rootGroup: rootGroup,
+    w: w,
+    h: h,
+    cfgPath: cfgPath,
+  )
 
   v.win = createWindow("events",
     WindowPosUndefined, WindowPosUndefined,
@@ -557,9 +565,6 @@ proc newView*(rootGroup: Group, w, h: int): View =
 
   discard v.rend.setRenderDrawBlendMode(BLENDMODE_BLEND)
 
-  v.w = w
-  v.h = h
-  v.rootGroup = rootGroup
   v.gui = newGui(v.rend, v.textcache)
   v.cfg.ts = initSpan[Time](0.0, 1.0)
   v.cfg.rowSize = 12
@@ -570,13 +575,14 @@ proc newView*(rootGroup: Group, w, h: int): View =
   v.tMeasure = NoTime
   v.cmdLine = CmdLine()
   
-  v.load("~/.bitlinerc")
-
+  v.load(v.cfgPath)
+  
   return v
 
 
 proc closeAll*(v: View) =
-  v.cfg.groupViews.clear
+  for _, gv in v.cfg.groupViews:
+    gv.isOpen = false
 
 proc openAll*(v: View) =
   proc aux(g: Group) =
@@ -673,6 +679,11 @@ proc setBin(v:View, g: Group, bin: Bin) =
       aux(cg)
   aux(g)
 
+
+proc toggleBin(v:View, bin: Bin) =
+  v.cfg.hideBin[bin] = not v.cfg.hideBin[bin]
+
+
 proc sdlEvent*(v: View, e: sdl.Event) =
 
   case e.kind
@@ -724,7 +735,7 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         of sdl.K_LSHIFT:
           v.tMeasure = v.x2time(v.mouseX)
         of sdl.K_s:
-          v.save("~/.bitlinerc")
+          v.save(v.cfgPath)
         of sdl.K_a:
           v.cfg.yTop = 0
           if v.rootGroup.ts.lo != NoTime and v.rootGroup.ts.hi != NoTime:
@@ -736,10 +747,10 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         of sdl.K_1..sdl.K_9:
           let bin = key.int - sdl.K_1.int + 1
           if (getModState().int32 and (KMOD_LSHIFT.int32 or KMOD_RSHIFT.int32)) != 0:
-            v.cfg.hideBin[bin] = not v.cfg.hideBin[bin]
+            v.toggleBin(bin)
           else:
             if v.curGroup != nil:
-              setBin(v, v.curGroup, bin)
+              v.setBin(v.curGroup, bin)
         of sdl.K_COMMA:
           v.zoomX 1.0/0.9
         of sdl.K_PERIOD:
