@@ -4,9 +4,7 @@ import strutils
 import tables
 import hashes
 import math
-import gui
 import sets
-import textcache
 
 import sdl2/sdl except Event
 
@@ -27,6 +25,7 @@ type
 
   Group* = ref object
     parent*: Group
+    depth*: int
     id*: string
     ts*: TimeSpan
     vs*: ValueSpan
@@ -59,6 +58,15 @@ const
 
 proc hash*(g: Group): Hash =
   result = hash cast[pointer](g)
+
+proc `$`*(g: Group): string =
+  var ids: seq[string]
+  var g = g
+  while g != nil:
+    if g.id.len > 0:
+      ids.insert g.id
+    g = g.parent
+  ids.join(".")
 
 proc siFmt*(v: SomeNumber, unit="", align=false): string =
   
@@ -127,8 +135,10 @@ proc fmtFrequency*(f: float): string =
   siFmt(f, "Hz")
 
 proc newGroup*(parent: Group=nil, id=""): Group =
+  let depth = if parent == nil: 0 else: parent.depth+1
   Group(
     parent: parent,
+    depth: depth,
     id: id,
     ts: initSpan[Time](),
     vs: initSpan[Value](),

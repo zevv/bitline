@@ -1,12 +1,14 @@
 
 import sets
 import algorithm
+import os
 import sugar
 import strutils
 import strformat
 import times except Time
 import hashes
 import tables
+import json
 import math
 
 import chroma except Color
@@ -22,7 +24,7 @@ const
   colGrid         = sdl.Color(r:196, g:196, b:196, a: 96)
   colCursor       = sdl.Color(r:255, g:128, b:128, a:255)
   colMeasure      = sdl.Color(r:255, g:255, b:128, a: 32)
-  colGroupSel     = sdl.Color(r:255, g:255, b:255, a: 10)
+  colGroupSel     = sdl.Color(r:128, g:128, b:255, a: 20)
   colStatusbar    = sdl.Color(r:255, g:255, b:255, a:128)
   colEvent        = sdl.Color(r:  0, g:255, b:173, a:150)
 
@@ -36,14 +38,18 @@ type
     isOpen: bool
     bin*: Bin
 
-  View* = ref object
+  ViewConfig = object
+    yTop: int
+    rowSize: int
     ts: TimeSpan
+    groupViews: Table[string, GroupView]
+    hideBin: array[10, bool]
+
+  View* = ref object
+    cfg: ViewConfig
     rootGroup: Group
     pixelsPerSecond: float
     tMeasure: Time
-    ytop: int
-    rowSize: int
-    lineSpacing: float
     w, h: int
     mouseX, mouseY: int
     dragX, dragY: int
@@ -58,8 +64,6 @@ type
     rend: sdl.Renderer
     textCache: TextCache
     cmdLine: CmdLine
-    hideBin: set[Bin]
-    groupViews: Table[Group, GroupView]
 
   CmdLine = ref object
     active: bool
@@ -73,22 +77,23 @@ type
 
 proc groupView(v: View, g: Group): GroupView =
   if g != nil:
-    result = v.groupViews.mgetOrPut(g, GroupView(bin: 1))
+    result = v.cfg.groupViews.mgetOrPut($g, GroupView(bin: 1))
 
 proc time2x(v: View, t: Time): int =
-  result = int((t - v.ts.lo) * v.pixelsPerSecond)
+  result = int((t - v.cfg.ts.lo) * v.pixelsPerSecond)
 
 proc x2time(v: View, x: int): Time =
-  v.ts.lo + (x / v.w) * (v.ts.hi - v.ts.lo)
+  v.cfg.ts.lo + (x / v.w) * (v.cfg.ts.hi - v.cfg.ts.lo)
 
-proc color(bin: Bin): Color =
+proc color(bin: Bin, depth=0): Color =
   let hue = bin.float / 9.0 * 360 + 160
-  let col = chroma.ColorPolarLUV(h: hue, c: 100.0, l: 70.0).color()
+  let luma = 50 + 50 / (depth+1)
+  let col = chroma.ColorPolarLUV(h: hue, c: 100.0, l: luma).color()
   Color(r: (col.r * 255).uint8, g: (col.g * 255).uint8, b: (col.b * 255).uint8, a: 255.uint8)
 
 proc groupColor(v: View, g: Group): Color =
   let gv = v.groupView(g)
-  gv.bin.color()
+  gv.bin.color(g.depth)
 
 # Drawing primitives
 
@@ -118,10 +123,10 @@ proc drawText(v: View, x, y: int, text: string, col: sdl.Color, align=AlignLeft)
 proc drawGrid(v: View) =
 
   let
-    y1 = v.rowSize + 2
-    y2 = v.h - v.rowSize * 3 - 5
-    y3 = v.h - v.rowSize * 2 - 5
-    y4 = v.h - v.rowSize * 1 - 4
+    y1 = v.cfg.rowSize + 2
+    y2 = v.h - v.cfg.rowSize * 3 - 5
+    y3 = v.h - v.cfg.rowSize * 2 - 5
+    y4 = v.h - v.cfg.rowSize * 1 - 4
 
   v.setColor(colGrid)
   v.drawLine(0, y1, v.w, y1)
@@ -133,7 +138,7 @@ proc drawGrid(v: View) =
   proc aux(tFrom: DateTime, dt: float, fmts1, fmts2: string) =
     var
       t = tFrom.toTime.toUnixFloat
-      dtw = v.w.float * dt / v.ts.duration
+      dtw = v.w.float * dt / v.cfg.ts.duration
       alpha = uint8 min( 64, dtw)
 
     var col = colGrid
@@ -141,7 +146,7 @@ proc drawGrid(v: View) =
     v.setColor col
 
     if dtw > 5 and dtw < v.w.float:
-      while t < v.ts.hi:
+      while t < v.cfg.ts.hi:
         let x = v.time2x(t)
         if x > -80 and x < v.w:
           v.drawLine(x, y1, x, y4)
@@ -151,7 +156,7 @@ proc drawGrid(v: View) =
             v.drawText(x+2, y3, t.fromUnixFloat.utc.format(fmts2), col)
         t += dt
 
-  let t = v.ts.lo.fromUnixFloat.utc
+  let t = v.cfg.ts.lo.fromUnixFloat.utc
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()), 0.001, "mm:ss", "fff")
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()), 0.01, "mm:ss", "fff")
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()), 0.1, "mm:ss", "fff")
@@ -171,7 +176,7 @@ proc drawCursor(v: View) =
     t = v.x2time(x)
 
   v.setColor(colCursor)
-  v.drawFillRect(x, v.rowSize, x, v.h)
+  v.drawFillRect(x, v.cfg.rowSize, x, v.h)
   var label = ""
   
   if v.tMeasure == NoTime:
@@ -272,16 +277,18 @@ proc drawData(v: View) =
 
     let
       gv = v.groupView(g)
-      ppv = if g.vs.lo != g.vs.hi: h.float / (g.vs.hi - g.vs.lo) else: 0.0
-      logMin = log(max(g.vs.lo, 1e-3), 10)
-      logMax = log(max(g.vs.hi, 1e-3), 10)
+      lo = g.vs.lo
+      hi = g.vs.hi
+      ppv = if lo != hi: h.float / (hi - lo) else: 0.0
+      logMin = log(max(lo, 1e-3), 10)
+      logMax = log(max(hi, 1e-3), 10)
       ppvLog = h.float / (logMax - logMin)
 
     proc val2y(val: float): int =
       if gv.graphScale == gsLog:
         y + h - int((log(max(val, 1e-3), 10) - logMin) * ppvLog).clamp(0, h)
       else:
-        y + h - int((val - g.vs.lo) * ppv).clamp(0, h)
+        y + h - int((val - lo) * ppv).clamp(0, h)
 
     # graph state
     var
@@ -296,8 +303,8 @@ proc drawData(v: View) =
       nTot = 0
 
     # Binary search for event indices which lie in the current view
-    var i1 = g.events.lowerbound(v.ts.lo, (e, t) => cmp(if e.ts.hi != NoTime: e.ts.hi else: e.ts.lo, t))
-    var i2 = g.events.upperbound(v.ts.hi, (e, t) => cmp(e.ts.lo, t))
+    var i1 = g.events.lowerbound(v.cfg.ts.lo, (e, t) => cmp(if e.ts.hi != NoTime: e.ts.hi else: e.ts.lo, t))
+    var i2 = g.events.upperbound(v.cfg.ts.hi, (e, t) => cmp(e.ts.lo, t))
 
     if i1 > 0: dec i1
     if i2 < g.events.len: inc i2
@@ -338,17 +345,18 @@ proc drawData(v: View) =
             # Events with a value get graphed
             let vAvg = vTot / nTot.float
             (vTot, nTot) = (0.0, 0)
-            var (y, y0, yMax, yMin) = (vAvg.val2y, 0.val2y, vMax.val2y, vMin.val2y)
-            points.add Point(x: x1, y: y)
+            var (y1, y2, yMax, yMin) = (vAvg.val2y, 0.val2y, vMax.val2y, vMin.val2y)
+            points.add Point(x: x1, y: y1)
 
             assert yMax <= yMin
-            if yMax < y0 and yMin < y0:
+            if yMax < y2 and yMin < y2:
               yMax = min(yMax, yMin)
-              yMin = y0
-            if yMax > y0 and yMin > y0:
-              yMax = y0
+              yMin = y2
+            if yMax > y2 and yMin > y2:
+              yMax = y2
               yMin = max(yMax, yMin)
-            graphRects.add Rect(x: x1, y: yMax, w: x2-x1, h: yMin-yMax)
+            #graphRects.add Rect(x: x1, y: y1, w: x2-x1, h: y2-y1)
+            graphRects.add Rect(x: x1, y: y, w: x2-x1, h: h)
 
             vmin = Value.high
             vMax = Value.low
@@ -379,7 +387,7 @@ proc drawData(v: View) =
       discard v.rend.renderDrawLines(points[0].addr, points.len)
 
     if graphRects.len > 0:
-      col.a = 64
+      col.a = 128
       v.setColor(col)
       discard v.rend.renderFillRects(graphRects[0].addr, graphRects.len)
 
@@ -387,23 +395,23 @@ proc drawData(v: View) =
 
   # Draw groups
 
-  var y = v.yTop + 20
+  var y = v.cfg.yTop + 20
 
-  proc drawGroup(g: Group, depth: int) =
+  proc drawGroup(g: Group) =
 
     let gv = v.groupView(g)
 
-    if g != v.rootGroup and gv.bin in v.hideBin:
+    if g != v.rootGroup and v.cfg.hideBin[gv.bin]:
       for id, cg in g.groups:
-        drawGroup(cg, depth+1)
+        drawGroup(cg)
       return
 
-    if not v.ts.overlaps(g.ts):
-      return
+    #if not v.cfg.ts.overlaps(g.ts):
+    #  return
 
     let isOpen = gv.isOpen
     let yGroup = y
-    let rowSize = v.rowSize * pow(1.5, gv.height.float).int
+    let rowSize = v.cfg.rowSize * pow(1.5, gv.height.float).int
 
     # Horizontal separator
     v.setColor(colGrid)
@@ -415,7 +423,7 @@ proc drawData(v: View) =
     var arrow = ""
     if g.groups.len > 0:
       arrow = if isOpen: "▼ " else: "▶ "
-    labels.add Label(x: 0, y: y, text: repeat(" ", depth) & arrow & g.id & " ", col: c)
+    labels.add Label(x: 0, y: y, text: repeat(" ", g.depth) & arrow & g.id & " ", col: c)
     if g.events.len > 0:
       h = rowSize
       drawEvents(g, y + 1, h)
@@ -433,20 +441,20 @@ proc drawData(v: View) =
         if g.events.len > 0:
           let ts1 = g.events[0].ts.lo
           let ts2 = g.events[^1].ts.hi
-          if ts1 < v.ts.hi and (ts2 == NoTime or ts2 > v.ts.lo):
-            drawEvents(g, y, 1)
-            inc y
+          if ts1 < v.cfg.ts.hi and (ts2 == NoTime or ts2 > v.cfg.ts.lo):
+            drawEvents(g, y, 2)
+            inc y, 3
             inc n
         if n < rowSize:
           for id, cg in g.groups:
             aux(cg)
       aux(g)
 
-    y = max(y, yGroup + v.rowSize) + 3
+    y = max(y, yGroup + v.cfg.rowSize) + 3
 
     if isOpen:
       for id, cg in g.groups:
-        drawGroup(cg, depth+1)
+        drawGroup(cg)
 
     # Check for mouse hover
     if v.mouseY >= yGroup and v.mouseY < y:
@@ -458,16 +466,16 @@ proc drawData(v: View) =
 
   # Recursively draw all groups
 
-  drawGroup(v.rootGroup, 0)
+  drawGroup(v.rootGroup)
 
   # Draw evdata for current event
 
   let e = v.curEvent
   if e.ts.lo != NoTime and v.tMeasure == NoTime:
+    var text = e.data
     if e.value != NoValue:
-      labels.add Label(x: v.mouseX + 15, y: v.mouseY, text: e.value.siFmt, col: colEvent)
-    elif e.data != "":
-      labels.add Label(x: v.mouseX + 15, y: v.mouseY, text: e.data, col: colEvent)
+      text = text & " (" & e.value.siFmt & ")"
+    labels.add Label(x: v.mouseX + 15, y: v.mouseY, text: text, col: colEvent)
 
   # Render all labels on top
 
@@ -475,12 +483,11 @@ proc drawData(v: View) =
   col.a = 240
   for l in labels:
     let tt = v.textCache.renderText(l.text, l.col)
-    var r = Rect(x: l.x, y: l.y, w: tt.w, h: tt.h)
-    v.setColor(col)
-    col.a = 200
-    discard v.rend.renderFillRect(r.addr)
-    discard v.rend.renderCopy(tt.tex, nil, r.addr)
-
+    if tt != nil:
+      var r = Rect(x: l.x, y: l.y, w: tt.w, h: tt.h)
+      v.setColor(col)
+      discard v.rend.renderFillRect(r.addr)
+      discard v.rend.renderCopy(tt.tex, nil, r.addr)
 
 
 proc drawStatusbar(v: View, aps: AppStats) =
@@ -502,7 +509,7 @@ proc drawStatusbar(v: View, aps: AppStats) =
       "groups: " & siFmt(aps.groupCount) & ", " &
       "events: " & siFmt(aps.eventCount)
 
-  let h = v.rowSize + 3
+  let h = v.cfg.rowSize + 3
   let y = v.h - h
   var r = Rect(x: 0, y: y, w: v.w, h: h)
 
@@ -513,7 +520,7 @@ proc drawStatusbar(v: View, aps: AppStats) =
   v.drawText(2, v.h - h, text, colStatusbar)
 
   for bin in Bin.low .. Bin.high:
-    var col = if bin in v.hideBin:
+    var col = if v.cfg.hideBin[bin]:
       colGrid
     else:
       bin.color()
@@ -536,6 +543,7 @@ proc drawGui(v: View) =
   v.gui.stop()
 
 
+proc load*(v: View, fname: string)
 
 proc newView*(rootGroup: Group, w, h: int): View =
   let v = View()
@@ -553,21 +561,22 @@ proc newView*(rootGroup: Group, w, h: int): View =
   v.h = h
   v.rootGroup = rootGroup
   v.gui = newGui(v.rend, v.textcache)
-  v.ts = initSpan[Time](0.0, 1.0)
-  v.rowSize = 12
-  v.lineSpacing = 3
+  v.cfg.ts = initSpan[Time](0.0, 1.0)
+  v.cfg.rowSize = 12
 
   v.groupView(rootGroup).isOpen = true
   echo v.groupView(rootGroup)[]
 
   v.tMeasure = NoTime
   v.cmdLine = CmdLine()
+  
+  v.load("~/.bitlinerc")
 
   return v
 
 
 proc closeAll*(v: View) =
-  v.groupViews.clear
+  v.cfg.groupViews.clear
 
 proc openAll*(v: View) =
   proc aux(g: Group) =
@@ -578,16 +587,16 @@ proc openAll*(v: View) =
 
 proc zoomX*(v: View, f: float) =
   let tm = v.x2time(v.mouseX)
-  v.ts.lo = tm - (tm - v.ts.lo) * f
-  v.ts.hi = tm + (v.ts.hi - tm) * f
+  v.cfg.ts.lo = tm - (tm - v.cfg.ts.lo) * f
+  v.cfg.ts.hi = tm + (v.cfg.ts.hi - tm) * f
 
 proc panY*(v: View, dy: int) =
-  v.yTop -= dy
+  v.cfg.yTop -= dy
 
 proc panX*(v: View, dx: int) =
-  let dt = (v.ts.hi - v.ts.lo) / v.w.float * dx.float
-  v.ts.lo = v.ts.lo + dt
-  v.ts.hi = v.ts.hi + dt
+  let dt = (v.cfg.ts.hi - v.cfg.ts.lo) / v.w.float * dx.float
+  v.cfg.ts.lo = v.cfg.ts.lo + dt
+  v.cfg.ts.hi = v.cfg.ts.hi + dt
 
 proc getWindow*(v: View): Window =
   v.win
@@ -597,11 +606,11 @@ proc setTMeasure*(v: View, t: Time) =
 
 proc draw*(v: View, appStats: AppStats) =
 
-  if v.ts.lo == 0.0 and v.ts.hi == 1.0 and v.rootGroup.ts.hi != NoTime:
-    v.ts = v.rootGroup.ts
+  if v.cfg.ts.lo == 0.0 and v.cfg.ts.hi == 1.0 and v.rootGroup.ts.hi != NoTime:
+    v.cfg.ts = v.rootGroup.ts
 
-  v.rowSize = v.rowSize.clamp(4, 128)
-  v.pixelsPerSecond = v.w.float / (v.ts.hi - v.ts.lo)
+  v.cfg.rowSize = v.cfg.rowSize.clamp(4, 128)
+  v.pixelsPerSecond = v.w.float / (v.cfg.ts.hi - v.cfg.ts.lo)
 
   let t1 = cpuTime()
 
@@ -609,10 +618,10 @@ proc draw*(v: View, appStats: AppStats) =
   var r = Rect(x: 0, y: 0, w: v.w, h: v.h)
   discard v.rend.renderFillRect(r.addr)
 
-  var rTop = Rect(x:0, y:0, w:v.w, h:v.rowSize + 2)
-  var rBot = Rect(x:0, y:v.h - rTop.h, w:v.w, h:v.rowSize + 2)
+  var rTop = Rect(x:0, y:0, w:v.w, h:v.cfg.rowSize + 2)
+  var rBot = Rect(x:0, y:v.h - rTop.h, w:v.w, h:v.cfg.rowSize + 2)
   var rMain = Rect(x:0, y:rTop.h, w:v.w, h:v.h-rTop.h-rBot.h)
-  v.textCache.setFontSize(v.rowSize)
+  v.textCache.setFontSize(v.cfg.rowSize)
 
   discard v.rend.rendersetClipRect(addr rMain)
 
@@ -628,6 +637,19 @@ proc draw*(v: View, appStats: AppStats) =
   v.rend.renderPresent
 
   v.stats.renderTime = cpuTime() - t1
+
+
+proc save*(v: View, fname: string) =
+  let js = pretty(%v.cfg)
+  writeFile(fname.expandTilde, js)
+
+
+proc load*(v: View, fname: string) = 
+  try:
+    let js = readFile(fname.expandTilde)
+    v.cfg = to(parseJson(js), ViewConfig)
+  except:
+    discard
 
 
 proc handleCmd(v: View, s: string) =
@@ -694,17 +716,19 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         of sdl.K_SEMICOLON, sdl.K_SLASH:
           c.active = true
         of sdl.K_EQUALS:
-          inc v.rowSize
+          inc v.cfg.rowSize
         of sdl.K_MINUS:
-          dec v.rowSize
+          dec v.cfg.rowSize
+        of sdl.K_0:
+          v.cfg.rowSize = 12
         of sdl.K_LSHIFT:
           v.tMeasure = v.x2time(v.mouseX)
         of sdl.K_s:
-          v.showGui = true
+          v.save("~/.bitlinerc")
         of sdl.K_a:
-          v.yTop = 0
+          v.cfg.yTop = 0
           if v.rootGroup.ts.lo != NoTime and v.rootGroup.ts.hi != NoTime:
-            v.ts = v.rootGroup.ts
+            v.cfg.ts = v.rootGroup.ts
         of sdl.K_c:
           v.closeAll()
         of sdl.K_o:
@@ -712,10 +736,7 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         of sdl.K_1..sdl.K_9:
           let bin = key.int - sdl.K_1.int + 1
           if (getModState().int32 and (KMOD_LSHIFT.int32 or KMOD_RSHIFT.int32)) != 0:
-            if bin in v.hideBin:
-              v.hideBin.excl bin
-            else:
-              v.hideBin.incl bin
+            v.cfg.hideBin[bin] = not v.cfg.hideBin[bin]
           else:
             if v.curGroup != nil:
               setBin(v, v.curGroup, bin)
@@ -728,9 +749,9 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         of sdl.K_RIGHT:
           v.panX +50
         of sdl.K_UP:
-          v.yTop += 50
+          v.cfg.yTop += 50
         of sdl.K_DOWN:
-          v.yTop -= 50
+          v.cfg.yTop -= 50
         of sdl.K_h:
           discard sdl.showSimpleMessageBox(0, "help", usage(), v.getWindow());
         of sdl.K_l:
@@ -807,8 +828,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           if v.curGroup != nil:
             v.groupView(v.curGroup).isOpen = true
             let dt = v.curGroup.ts.hi - v.curGroup.ts.lo
-            v.ts.lo = v.curGroup.ts.lo - (dt / 5)
-            v.ts.hi = v.curGroup.ts.hi + (dt / 20)
+            v.cfg.ts.lo = v.curGroup.ts.lo - (dt / 5)
+            v.cfg.ts.hi = v.curGroup.ts.hi + (dt / 20)
 
       if b == sdl.BUTTON_MIDDLE:
         v.tMeasure = NoTime

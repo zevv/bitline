@@ -2,7 +2,6 @@ import sdl2/sdl
 import textcache
 import math
 import strutils
-import typetraits
 
 const DEF_MARGIN = 2
 const DEF_PADDING = 4

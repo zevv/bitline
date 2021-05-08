@@ -46,7 +46,8 @@ proc addEvent(app: App, t: Time, key, ev, evdata: string) =
 
   var value = NoValue
   try:
-    value = evdata.parseFloat()
+    let vs = evdata.splitWhitespace()
+    value = vs[0].parseFloat()
   except:
     discard
 
