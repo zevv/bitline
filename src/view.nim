@@ -87,8 +87,8 @@ proc x2time(v: View, x: int): Time =
   v.cfg.ts.lo + (x / v.w) * (v.cfg.ts.hi - v.cfg.ts.lo)
 
 proc color(bin: Bin, depth=0): Color =
-  let hue = bin.float / 9.0 * 360 + 160
-  let luma = 50 + 50 / (depth+1)
+  let hue = bin.float / 9.0 * 360 + 180
+  let luma = 30 + 40 / (depth+1)
   let col = chroma.ColorPolarLUV(h: hue, c: 100.0, l: luma).color()
   Color(r: (col.r * 255).uint8, g: (col.g * 255).uint8, b: (col.b * 255).uint8, a: 255.uint8)
 
@@ -429,7 +429,7 @@ proc drawData(v: View) =
     labels.add Label(x: 0, y: y, text: repeat(" ", g.depth) & arrow & g.id & " ", col: c)
     if g.events.len > 0:
       h = rowSize
-      drawEvents(g, y + 1, h)
+      drawEvents(g, y + 3, h-4)
 
     # Draw measurements for this group
     if v.tMeasure != NoTime:
@@ -596,6 +596,11 @@ proc zoomX*(v: View, f: float) =
   v.cfg.ts.lo = tm - (tm - v.cfg.ts.lo) * f
   v.cfg.ts.hi = tm + (v.cfg.ts.hi - tm) * f
 
+proc zoomAll*(v: View) =
+  v.cfg.yTop = 0
+  if v.rootGroup.ts.lo != NoTime and v.rootGroup.ts.hi != NoTime:
+    v.cfg.ts = v.rootGroup.ts
+
 proc panY*(v: View, dy: int) =
   v.cfg.yTop -= dy
 
@@ -737,9 +742,7 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         of sdl.K_s:
           v.save(v.cfgPath)
         of sdl.K_a:
-          v.cfg.yTop = 0
-          if v.rootGroup.ts.lo != NoTime and v.rootGroup.ts.hi != NoTime:
-            v.cfg.ts = v.rootGroup.ts
+          v.zoomAll()
         of sdl.K_c:
           v.closeAll()
         of sdl.K_o:
