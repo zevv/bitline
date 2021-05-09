@@ -24,7 +24,7 @@ const
   colGrid         = sdl.Color(r:196, g:196, b:196, a: 96)
   colCursor       = sdl.Color(r:255, g:128, b:128, a:255)
   colMeasure      = sdl.Color(r:255, g:255, b:128, a: 32)
-  colGroupSel     = sdl.Color(r:128, g:128, b:255, a: 20)
+  colGroupSel     = sdl.Color(r:255, g:255, b:255, a: 12)
   colStatusbar    = sdl.Color(r:255, g:255, b:255, a:128)
   colEvent        = sdl.Color(r:  0, g:255, b:173, a:150)
 
@@ -77,7 +77,7 @@ type
 
 # Misc helpers
 
-proc initViewConfig(cfg: var ViewConfig)
+proc resetConfig(v: View)
 
 proc groupView(v: View, g: Group): GroupView =
   if g != nil:
@@ -139,9 +139,11 @@ proc drawGrid(v: View) =
   if v.tMeasure != NoTime:
     return
 
-  proc aux(tFrom: DateTime, dt: float, fmts1, fmts2: string) =
+  proc aux(tFrom: DateTime, step: Duration, fmts1, fmts2: string) =
     var
-      t = tFrom.toTime.toUnixFloat
+      dt = inMilliseconds(step).float / 1000.0
+      t = tFrom
+      tTo = v.cfg.ts.hi.fromUnixFloat.utc
       dtw = v.w.float * dt / v.cfg.ts.duration
       alpha = uint8 min( 64, dtw)
 
@@ -150,28 +152,39 @@ proc drawGrid(v: View) =
     v.setColor col
 
     if dtw > 5 and dtw < v.w.float:
-      while t < v.cfg.ts.hi:
-        let x = v.time2x(t)
+      while t < tTo:
+        let x = v.time2x(t.toTime.toUnixFloat)
         if x > -80 and x < v.w:
           v.drawLine(x, y1, x, y4)
           if dtw > 80:
-            v.drawText(x+2, y2, t.fromUnixFloat.utc.format(fmts1), col)
+            v.drawText(x+2, y2, t.format(fmts1), col)
           if dtw > 20:
-            v.drawText(x+2, y3, t.fromUnixFloat.utc.format(fmts2), col)
-        t += dt
+            v.drawText(x+2, y3, t.format(fmts2), col)
+        t += step
 
   let t = v.cfg.ts.lo.fromUnixFloat.utc
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()), 0.001, "mm:ss", "fff")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()), 0.01, "mm:ss", "fff")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()), 0.1, "mm:ss", "fff")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()), 1.0, "HH:mm:ss", "ss")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()), 10.0, "HH:mm:ss", "ss")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()), 60.0, "HH:mm:ss", "mm")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()), 600.0, "HH:mm", "mm")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=0, minute=0, second=0, utc()), 3600.0, "HH:mm", "HH")
-  aux(initDateTime(year=t.year, month=t.month, monthday=1, hour=0, minute=0, second=0, utc()), 24*3600.0, "ddd dd-MM", "dd")
-  aux(initDateTime(year=t.year, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()), 30*24*3600.0, "MMM yyyy", "MMM")
-  aux(initDateTime(year=1970, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()), 365*24*3600.0, "yyyy", "MMM")
+  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
+      initDuration(milliseconds=1), "hh:mm:ss", "fff")
+  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
+      initduration(milliseconds=10), "hh:mm:ss", "fff")
+  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
+      initDuration(milliseconds=100), "hh:mm:ss", "fff")
+  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
+      initDuration(seconds=1), "HH:mm:ss", "ss")
+  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
+      initDuration(seconds=10), "HH:mm:ss", "ss")
+  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
+      initDuration(minutes=1), "HH:mm:ss", "mm")
+  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
+      initDuration(minutes=10), "HH:mm", "mm")
+  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=0, minute=0, second=0, utc()),
+      initduration(hours=1), "HH:mm", "HH")
+  aux(initDateTime(year=t.year, month=t.month, monthday=1, hour=0, minute=0, second=0, utc()),
+      initduration(days=1), "ddd dd-MM", "dd")
+  aux(initDateTime(year=t.year, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()),
+      initDuration(weeks=4), "MMM yyyy", "MMM")
+  aux(initDateTime(year=1970, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()),
+      initDuration(weeks=52), "yyyy", "MMM")
 
 
 proc drawCursor(v: View) =
@@ -549,12 +562,15 @@ proc drawGui(v: View) =
   v.gui.stop()
 
 
-proc load*(v: View, fname: string)
+proc loadConfig*(v: View, fname: string)
  
-proc initViewConfig(cfg: var ViewConfig) =
-  cfg.ts = initSpan[Time](0.0, 1.0)
-  cfg.rowSize = 12
-  cfg.luma = 60
+proc resetConfig(v: View) =
+  v.cfg.ts = initSpan[Time](0.0, 1.0)
+  v.cfg.rowSize = 12
+  v.cfg.luma = 60
+  v.cfg.groupViews.clear()
+  v.cfg.hideBin.reset()
+  v.groupView(v.rootGroup).isOpen = true
 
 proc newView*(rootGroup: Group, w, h: int, cfgPath: string): View =
   let v = View(
@@ -574,15 +590,12 @@ proc newView*(rootGroup: Group, w, h: int, cfgPath: string): View =
   discard v.rend.setRenderDrawBlendMode(BLENDMODE_BLEND)
 
   v.gui = newGui(v.rend, v.textcache)
-  v.cfg.initViewConfig()
-
-  v.groupView(rootGroup).isOpen = true
-  echo v.groupView(rootGroup)[]
+  v.resetConfig()
 
   v.tMeasure = NoTime
   v.cmdLine = CmdLine()
   
-  v.load(v.cfgPath)
+  v.loadConfig(v.cfgPath)
   
   return v
 
@@ -657,17 +670,17 @@ proc draw*(v: View, appStats: AppStats) =
   v.stats.renderTime = cpuTime() - t1
 
 
-proc save*(v: View, fname: string) =
+proc saveConfig*(v: View, fname: string) =
   let js = pretty(%v.cfg)
   writeFile(fname.expandTilde, js)
 
 
-proc load*(v: View, fname: string) = 
+proc loadConfig*(v: View, fname: string) = 
   try:
     let js = readFile(fname.expandTilde)
     v.cfg = to(parseJson(js), ViewConfig)
   except:
-    v.cfg.initViewConfig()
+    v.resetConfig()
 
 
 proc handleCmd(v: View, s: string) =
@@ -743,8 +756,10 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.cfg.rowSize = 12
         of sdl.K_LSHIFT:
           v.tMeasure = v.x2time(v.mouseX)
+        of sdl.K_r:
+          v.resetConfig()
         of sdl.K_s:
-          v.save(v.cfgPath)
+          v.saveConfig(v.cfgPath)
         of sdl.K_a:
           v.zoomAll()
         of sdl.K_c:
@@ -788,8 +803,6 @@ proc sdlEvent*(v: View, e: sdl.Event) =
       case key
       of sdl.K_LSHIFT:
         v.tMeasure = NoTime
-      of sdl.K_s:
-        v.showGui = false
       else:
         discard
 
