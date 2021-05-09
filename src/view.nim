@@ -40,6 +40,7 @@ type
 
   ViewConfig = object
     yTop: int
+    luma: int
     rowSize: int
     ts: TimeSpan
     groupViews: Table[string, GroupView]
@@ -76,6 +77,8 @@ type
 
 # Misc helpers
 
+proc initViewConfig(cfg: var ViewConfig)
+
 proc groupView(v: View, g: Group): GroupView =
   if g != nil:
     result = v.cfg.groupViews.mgetOrPut($g, GroupView(bin: 1))
@@ -86,15 +89,15 @@ proc time2x(v: View, t: Time): int =
 proc x2time(v: View, x: int): Time =
   v.cfg.ts.lo + (x / v.w) * (v.cfg.ts.hi - v.cfg.ts.lo)
 
-proc color(bin: Bin, depth=0): Color =
+proc binColor(v: View, bin: Bin, depth=0): Color =
   let hue = bin.float / 9.0 * 360 + 180
-  let luma = 30 + 40 / (depth+1)
+  let luma = float(v.cfg.luma) # + (100 - v.cfg.luma) / (depth+1)
   let col = chroma.ColorPolarLUV(h: hue, c: 100.0, l: luma).color()
   Color(r: (col.r * 255).uint8, g: (col.g * 255).uint8, b: (col.b * 255).uint8, a: 255.uint8)
 
 proc groupColor(v: View, g: Group): Color =
   let gv = v.groupView(g)
-  gv.bin.color(g.depth)
+  v.binColor(gv.bin, g.depth)
 
 # Drawing primitives
 
@@ -526,7 +529,7 @@ proc drawStatusbar(v: View, aps: AppStats) =
     var col = if v.cfg.hideBin[bin]:
       colGrid
     else:
-      bin.color()
+      v.binColor(bin)
     v.drawText(v.w - 128 + bin.int*13, v.h - h, $bin, col)
 
 
@@ -547,6 +550,11 @@ proc drawGui(v: View) =
 
 
 proc load*(v: View, fname: string)
+ 
+proc initViewConfig(cfg: var ViewConfig) =
+  cfg.ts = initSpan[Time](0.0, 1.0)
+  cfg.rowSize = 12
+  cfg.luma = 60
 
 proc newView*(rootGroup: Group, w, h: int, cfgPath: string): View =
   let v = View(
@@ -566,8 +574,7 @@ proc newView*(rootGroup: Group, w, h: int, cfgPath: string): View =
   discard v.rend.setRenderDrawBlendMode(BLENDMODE_BLEND)
 
   v.gui = newGui(v.rend, v.textcache)
-  v.cfg.ts = initSpan[Time](0.0, 1.0)
-  v.cfg.rowSize = 12
+  v.cfg.initViewConfig()
 
   v.groupView(rootGroup).isOpen = true
   echo v.groupView(rootGroup)[]
@@ -660,7 +667,7 @@ proc load*(v: View, fname: string) =
     let js = readFile(fname.expandTilde)
     v.cfg = to(parseJson(js), ViewConfig)
   except:
-    discard
+    v.cfg.initViewConfig()
 
 
 proc handleCmd(v: View, s: string) =
@@ -706,9 +713,6 @@ proc sdlEvent*(v: View, e: sdl.Event) =
       let
         key = e.key.keysym.sym
         c = v.cmdLine
-      if e.key.repeat == 1:
-        return
-      #echo key.repr
 
       if c.active:
         case key
@@ -768,6 +772,10 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.cfg.yTop -= 50
         of sdl.K_h:
           discard sdl.showSimpleMessageBox(0, "help", usage(), v.getWindow());
+        of sdl.K_RIGHTBRACKET:
+          v.cfg.luma = min(v.cfg.luma+10, 100)
+        of sdl.K_LEFTBRACKET:
+          v.cfg.luma = max(v.cfg.luma-10, 20)
         of sdl.K_l:
           if v.curGroup != nil:
             let gv = v.groupView(v.curGroup)
