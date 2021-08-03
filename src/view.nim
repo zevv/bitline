@@ -23,7 +23,7 @@ const
   colBg           = sdl.Color(r: 16, g: 16, b: 16, a:255)
   colGrid         = sdl.Color(r:196, g:196, b:196, a: 96)
   colCursor       = sdl.Color(r:255, g:128, b:128, a:255)
-  colMeasure      = sdl.Color(r:255, g:255, b:128, a: 32)
+  colMeasure      = sdl.Color(r:255, g:255, b:  0, a: 32)
   colGroupSel     = sdl.Color(r:255, g:255, b:255, a: 12)
   colStatusbar    = sdl.Color(r:255, g:255, b:255, a:128)
   colEvent        = sdl.Color(r:  0, g:255, b:173, a:150)
@@ -223,7 +223,7 @@ proc drawCursor(v: View) =
   v.drawText(x + 2, 0, label, colCursor, AlignCenter)
 
 
-proc measure(v: View, group: Group): string =
+proc measure(v: View, group: Group): (string, int) =
 
   let
     tMouse = v.x2time(v.mouse_x)
@@ -272,7 +272,7 @@ proc measure(v: View, group: Group): string =
     parts.add "min=" & siFmt(vMin)
     parts.add "max=" & siFmt(vMax)
 
-  result.add parts.join(", ")
+  result = (parts.join(", "), dutyCycle.int)
 
 
 proc drawData(v: View) =
@@ -449,7 +449,14 @@ proc drawData(v: View) =
 
     # Draw measurements for this group
     if v.tMeasure != NoTime:
-      labels.add Label(x: v.mouse_x+2, y: y, text: v.measure(g) & " ", col: colEvent)
+      let (label, duty) = v.measure(g)
+      let x = v.mouse_x
+      labels.add Label(x: x+2, y: y, text: label & " ", col: colEvent)
+      v.setColor(colEvent)
+      v.drawFillRect(x, y, x - duty, y+h)
+      var col = sdl.Color(r: 0, g: 0, b: 0, a:192)
+      v.setColor(col)
+      v.drawFillRect(x - duty, y, x-100, y+h)
 
     y += h
 
