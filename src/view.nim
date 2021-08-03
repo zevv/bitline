@@ -20,7 +20,7 @@ import gui
 import misc
 
 const
-  colBg           = sdl.Color(r: 16, g: 16, b: 16, a:255)
+  colBg           = sdl.Color(r:  0, g:  0, b: 16, a:255)
   colGrid         = sdl.Color(r:196, g:196, b:196, a: 96)
   colCursor       = sdl.Color(r:255, g:128, b:128, a:255)
   colMeasure      = sdl.Color(r:255, g:255, b:  0, a: 32)
@@ -406,7 +406,7 @@ proc drawData(v: View) =
       discard v.rend.renderDrawLines(points[0].addr, points.len)
 
     if graphRects.len > 0:
-      col.a = 128
+      col.a = 64
       v.setColor(col)
       discard v.rend.renderFillRects(graphRects[0].addr, graphRects.len)
 
@@ -452,7 +452,7 @@ proc drawData(v: View) =
       let (label, duty) = v.measure(g)
       let x = v.mouse_x
       labels.add Label(x: x+2, y: y, text: label & " ", col: colEvent)
-      v.setColor(colEvent)
+      v.setColor(colCursor)
       v.drawFillRect(x, y, x - duty, y+h)
       var col = sdl.Color(r: 0, g: 0, b: 0, a:192)
       v.setColor(col)

@@ -196,6 +196,9 @@ proc newApp*(w, h: int, path_session: string): App =
   let v = newView(app.root, w, h, path_session)
   app.views[sdl.getWindowId(v.getWindow())] = v
 
+  let cursor = sdl.createSystemCursor(sdl.SYSTEM_CURSOR_SIZEWE)
+  sdl.setCursor(cursor)
+
   return app
   
 

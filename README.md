@@ -16,6 +16,16 @@ nimble install sdl2_nim chroma
 nimble build
 ```
 
+## Input
+
+```
+<timestamp> + <tag.tag> [data]
+<timestamp> - <tag.tag>
+<timestamp> c <tag.tag> <counter value> [data]
+<timestamp> g <tag.tag> <gauge value> [data]
+```
+
+
 ## Usage
 
 ```
