@@ -15,6 +15,7 @@ keys:
  c /o          close all / open all
  l             toggle log scale for graphs"
  q             quit
+ s             save session view
  [ / ]         adjust alpha
  + / -         adjust font size
  shift         measure

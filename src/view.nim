@@ -24,7 +24,7 @@ const
   colGrid         = sdl.Color(r:196, g:196, b:196, a: 96)
   colCursor       = sdl.Color(r:255, g:128, b:128, a:255)
   colMeasure      = sdl.Color(r:255, g:255, b:  0, a: 32)
-  colGroupSel     = sdl.Color(r:255, g:255, b:255, a: 12)
+  colGroupSel     = sdl.Color(r:255, g:255, b:255, a:  8)
   colStatusbar    = sdl.Color(r:255, g:255, b:255, a:128)
   colEvent        = sdl.Color(r:  0, g:255, b:173, a:150)
 
@@ -211,6 +211,7 @@ proc drawCursor(v: View) =
     if dt != 0.0:
       label.add " / " & fmtFrequency(1.0/dt)
 
+    # Draw periodicy bars
     for i in -20..20:
       if i != 1:
         var col = colMeasure
@@ -449,14 +450,16 @@ proc drawData(v: View) =
 
     # Draw measurements for this group
     if v.tMeasure != NoTime:
+      var col = v.groupColor(g)
       let (label, duty) = v.measure(g)
-      let x = v.mouse_x
-      labels.add Label(x: x+2, y: y, text: label & " ", col: colEvent)
-      v.setColor(colCursor)
-      v.drawFillRect(x, y, x - duty, y+h)
-      var col = sdl.Color(r: 0, g: 0, b: 0, a:192)
+      let x1 = v.time2x(v.tMeasure)
+      let x2 = v.mouse_x
+      labels.add Label(x: x2+2, y: y, text: label & " ", col: colEvent)
       v.setColor(col)
-      v.drawFillRect(x - duty, y, x-100, y+h)
+      v.drawFillRect(x1, y, x1-duty, y+h)
+      col = sdl.Color(r: 0, g: 0, b: 0, a:255)
+      v.setColor(col)
+      v.drawFillRect(x1-duty, y, x1-100, y+h)
 
     y += h
 
