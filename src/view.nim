@@ -284,6 +284,9 @@ proc measure(v: View, group: Group): (string, int) =
 
 proc drawEvents(v:View, g: Group, y: int, h: int) =
 
+  if y < -h or y > v.h:
+    return
+
   # precalulate stuff for value-to-y calculations
 
   let
@@ -348,6 +351,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
       of ekCounter, ekGauge:
         let vAvg = vTot / nTot
+        echo nTot
         graphRects.add Rect(x: x1, y: y, w: x2-x1+1, h: h)
         pointsAvg.add Point(x: x1, y: vAvg.val2y)
 
