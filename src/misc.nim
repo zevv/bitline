@@ -41,10 +41,10 @@ type
     ekGauge,
 
   Event* = object
-    kind*: EventKind
     ts*: TimeSpan
     data*: string
     value*: Value
+    kind*: EventKind
 
   AppStats* = object
     eventCount*: int
@@ -54,7 +54,6 @@ const
   iso8601format* = "yyyy-MM-dd'T'HH:mm:ss'.'ffffff'Z'"
   NoTime* = float64.low
   NoValue* = float64.low
-
 
 proc hash*(g: Group): Hash =
   result = hash cast[pointer](g)
