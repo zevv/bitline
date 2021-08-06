@@ -40,7 +40,7 @@ proc graphs(t1, t2: float, depth: int) =
   var t = t1
   var v = 0.0
   while t <= t2:
-    echo t, " c graph.", depth, " ", sin(v) * sin(v * 0.05)
+    echo t, " g graph.", depth, " ", sin(v) * sin(v * 0.05)
     v += 0.1
     t += dt
 

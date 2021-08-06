@@ -91,6 +91,11 @@ proc groupView(v: View, g: Group): GroupView =
 proc time2x(v: View, t: Time): int =
   result = int((t - v.cfg.ts.lo) * v.pixelsPerSecond)
 
+proc ts2x(v: View, ts: TimeSpan): (int, int) =
+  let x1 = v.time2x(ts.lo)
+  let x2 = if ts.hi != NoTime: v.time2x(ts.hi) else: x1
+  (x1, x2)
+
 proc x2time(v: View, x: int): Time =
   v.cfg.ts.lo + (x / v.w) * (v.cfg.ts.hi - v.cfg.ts.lo)
 
@@ -309,14 +314,6 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
     rects = newSeqOfCap[Rect](g.events.len)
     graphRects = newSeqOfCap[Rect](g.events.len)
     pointsAvg: seq[Point]
-    pointsMin: seq[Point]
-    pointsMax: seq[Point]
-    prevX = int.low
-
-    vMin = Value.high
-    vMax = Value.low
-    vTot = 0.Value
-    nTot = 0
 
   # Binary search for event indices which lie in the current view
   var i1 = g.events.lowerbound(v.cfg.ts.lo, (e, t) => cmp(if e.ts.hi != NoTime: e.ts.hi else: e.ts.lo, t))
@@ -324,112 +321,69 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
   if i1 > 0: dec i1
   if i2 < g.events.len: inc i2
-  var i = 1
-  var x = 0
-  var x1 = 0
-  var x2 = 0
+
+  var
+    kind = g.events[i1].kind
+    i = i1
+    x1Next, x2Next: int
+    valueNext: Value
+    x1Cur = int.low
+    x2Cur = int.low
+    vTot, vMin, vMax, nTot: Value
+
+  proc emit() =
+    case kind
+      of ekOneshot, ekSpan:
+        rects.add Rect(x: x1Cur, y: y, w: x2Cur-x1Cur+1, h: h)
+
+      of ekCounter, ekGauge:
+        graphRects.add Rect(x: x1Cur, y: y, w: x2Cur-x1Cur+1, h: h)
+        pointsAvg.add Point(x: x1Cur, y: val2y(vTot / nTot))
+        if nTot > 1:
+          let yMin = vMin.val2Y
+          let yMax = vMax.val2Y
+          graphRects.add Rect(x: x1Cur, y: yMax, w: x2Cur-x1Cur+1, h: yMin-yMax)
 
   while i < i2:
 
-    var nTot = 0.Value
-    var vTot = 0.Value
-    var e: Event
-
+    # Collect all events on the current x position
     while i < i2:
-      e = g.events[i]
-      vTot += e.value
-      nTot += 1
-      x1 = v.time2x(e.ts.lo)
-      x2 = if e.ts.hi != NoTime: v.time2x(e.ts.hi) else: x1
-      if x1 > x or x2 > x:
-        break
+      let e = g.events[i]
       inc i
+      let (x1, x2) = v.ts2x(e.ts)
+      let value = e.value
+      if x1 > x2Cur+1 or x2 > x2Cur+1:
+        (x1Next, x2Next, valueNext) = (x1, x2, value)
+        break
+      vTot += value
+      vMin = min(vMin, value)
+      vMax = max(vMax, value)
+      nTot += 1
 
-    case e.kind
-      of ekOneshot, ekSpan:
-        rects.add Rect(x: x1, y: y, w: x2-x1+1, h: h)
+    if x1Cur != int.low:
+      emit()
 
-      of ekCounter, ekGauge:
-        let vAvg = vTot / nTot
-        echo nTot
-        graphRects.add Rect(x: x1, y: y, w: x2-x1+1, h: h)
-        pointsAvg.add Point(x: x1, y: vAvg.val2y)
+    x1Cur = x1Next
+    x2Cur = x2Next
+    vTot = valueNext
+    vMin = valueNext
+    vMAx = valueNext
+    nTot = 1
 
-    x = x2 + 1
-    inc i
+  emit()
 
-#  # Iterate visible events
-#  for i in i1 ..< i2:
-#
-#    let e = g.events[i]
-#
-#    # Calculate x for event start and end time
-#    var x1 = v.time2x(e.ts.lo)
-#    var x2 = if e.ts.hi == NoTime or e.ts.hi == e.ts.lo:
-#        x1 + 1 # Oneshot or incomplete span
-#      else:
-#        max(v.time2x(e.ts.hi), x1+1)
-#
-#    # Keep track of min, max and average of events with values
-#    if e.kind in { ekCounter, ekGauge }:
-#      vMin = min(vMin, e.value)
-#      vMax = max(vMax, e.value)
-#      vTot += e.value
-#      inc nTot
-#
-#    # Only draw this event if it gets drawn on a different pixel then the
-#    # previous event
-#    if x2 > prevX:
-#
-#      # Never overlap over previous events
-#      x1 = max(x1, prevX)
-#
-#      case e.kind
-#
-#        of ekOneshot, ekSpan:
-#          # Draw event bar
-#          rects.add Rect(x: x1, y: y, w: x2-x1, h: h)
-#
-#        of ekCounter, ekGauge:
-#          # Events with a value get graphed
-#          let vAvg = vTot / nTot.float
-#          pointsMin.add Point(x: x1, y: vMin.val2y)
-#          pointsAvg.add Point(x: x1, y: vAvg.val2y)
-#          pointsMax.add Point(x: x1, y: vMax.val2y)
-#          graphRects.add Rect(x: x1, y: y, w: x2-x1, h: h)
-#          vMin = Value.high
-#          vMax = Value.low
-#          (vTot, nTot) = (0.0, 0)
-#
-#      # Incomplete span gets a little arrow
-#      if e.ts.hi == NoTime:
-#        for i in 1..<h /% 2:
-#          rects.add Rect(x: x1+i, y: y+i, w: 1, h: h-i*2)
-#
-#      # Check for hovering
-#      if initSpan(y, y+h).contains(v.mouseY) and initSpan(x1, x2).contains(v.mouseX):
-#        v.curEvent = e
-#
-#      # Always leave a gap of 1 pixel between event, this makese sure gaps do
-#      # not go unnoticed, on any zoom level
-#      prevX = x2 + 1
-#
+
   var col = v.groupColor(g)
   v.setColor(col)
 
-  # Render all event rectangles
   if rects.len > 0:
     discard v.rend.renderFillRects(rects[0].addr, rects.len)
 
-  # Render graph events and lines
-
   if pointsAvg.len > 0:
-    #discard v.rend.renderDrawLines(pointsMin[0].addr, pointsMin.len)
-    #discard v.rend.renderDrawLines(pointsMax[0].addr, pointsMax.len)
     discard v.rend.renderDrawLines(pointsAvg[0].addr, pointsAvg.len)
 
   if graphRects.len > 0:
-    col.a = 64
+    col.a = 96
     v.setColor(col)
     discard v.rend.renderFillRects(graphRects[0].addr, graphRects.len)
 

@@ -79,7 +79,6 @@ proc addEvent(app: App, t: Time, key, ev, evdata: string) =
     else:
       discard
 
-
 # Propagate group timespan to parents and count events
 
 proc updateGroups(app: App, updateViews=false) =
