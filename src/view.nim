@@ -308,7 +308,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
     rects = newSeqOfCap[Rect](g.events.len)
     graphRects = newSeqOfCap[Rect](g.events.len)
     points: seq[Point]
-    prevX = int.low
+    xPrev = int.low
     vTot = 0.Value
     nTot = 0
   let
@@ -327,7 +327,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
     let e = g.events[i]
 
-    # Calculate x for event start and end time
+    # Calculate x1 and x2 for event start and end time
     var x1 = v.time2x(e.ts.lo)
     var x2 = if e.ts.hi == NoTime or e.ts.hi == e.ts.lo:
         x1 + 1 # Oneshot or incomplete span
@@ -341,10 +341,10 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
     # Only draw this event if it gets drawn on a different pixel then the
     # previous event
-    if x2 > prevX:
+    if x2 > xPrev:
 
       # Never overlap over previous events
-      x1 = max(x1, prevX)
+      x1 = max(x1, xPrev)
 
       case e.kind
 
@@ -379,7 +379,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
       # Always leave a gap of 1 pixel between event, this makese sure gaps do
       # not go unnoticed, on any zoom level
-      prevX = x2 + 1
+      xPrev = x2 + 1
 
   var col = v.groupColor(g)
   v.setColor(col)
