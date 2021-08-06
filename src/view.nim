@@ -282,8 +282,6 @@ proc measure(v: View, group: Group): (string, int) =
 
 
 
-# Draw all events for the given group
-
 proc drawEvents(v:View, g: Group, y: int, h: int) =
 
   # precalulate stuff for value-to-y calculations
@@ -307,13 +305,15 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
   var
     rects = newSeqOfCap[Rect](g.events.len)
     graphRects = newSeqOfCap[Rect](g.events.len)
-    points: seq[Point]
-    xPrev = int.low
-    vTot = 0.Value
-    nTot = 0
-  let
+    pointsAvg: seq[Point]
+    pointsMin: seq[Point]
+    pointsMax: seq[Point]
+    prevX = int.low
+
     vMin = Value.high
     vMax = Value.low
+    vTot = 0.Value
+    nTot = 0
 
   # Binary search for event indices which lie in the current view
   var i1 = g.events.lowerbound(v.cfg.ts.lo, (e, t) => cmp(if e.ts.hi != NoTime: e.ts.hi else: e.ts.lo, t))
@@ -327,7 +327,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
     let e = g.events[i]
 
-    # Calculate x1 and x2 for event start and end time
+    # Calculate x for event start and end time
     var x1 = v.time2x(e.ts.lo)
     var x2 = if e.ts.hi == NoTime or e.ts.hi == e.ts.lo:
         x1 + 1 # Oneshot or incomplete span
@@ -336,15 +336,17 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
     # Keep track of min, max and average of events with values
     if e.kind in { ekCounter, ekGauge }:
+      vMin = min(vMin, e.value)
+      vMax = max(vMax, e.value)
       vTot += e.value
       inc nTot
 
     # Only draw this event if it gets drawn on a different pixel then the
     # previous event
-    if x2 > xPrev:
+    if x2 > prevX:
 
       # Never overlap over previous events
-      x1 = max(x1, xPrev)
+      x1 = max(x1, prevX)
 
       case e.kind
 
@@ -355,18 +357,13 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
         of ekCounter, ekGauge:
           # Events with a value get graphed
           let vAvg = vTot / nTot.float
-          (vTot, nTot) = (0.0, 0)
-          var (y1, y2, yMax, yMin) = (vAvg.val2y, 0.val2y, vMax.val2y, vMin.val2y)
-          points.add Point(x: x1, y: y1)
-
-          assert yMax <= yMin
-          if yMax < y2 and yMin < y2:
-            yMax = min(yMax, yMin)
-            yMin = y2
-          if yMax > y2 and yMin > y2:
-            yMax = y2
-            yMin = max(yMax, yMin)
+          pointsMin.add Point(x: x1, y: vMin.val2y)
+          pointsAvg.add Point(x: x1, y: vAvg.val2y)
+          pointsMax.add Point(x: x1, y: vMax.val2y)
           graphRects.add Rect(x: x1, y: y, w: x2-x1, h: h)
+          vMin = Value.high
+          vMax = Value.low
+          (vTot, nTot) = (0.0, 0)
 
       # Incomplete span gets a little arrow
       if e.ts.hi == NoTime:
@@ -379,7 +376,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
       # Always leave a gap of 1 pixel between event, this makese sure gaps do
       # not go unnoticed, on any zoom level
-      xPrev = x2 + 1
+      prevX = x2 + 1
 
   var col = v.groupColor(g)
   v.setColor(col)
@@ -390,8 +387,10 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
   # Render graph events and lines
 
-  if points.len > 0:
-    discard v.rend.renderDrawLines(points[0].addr, points.len)
+  if pointsAvg.len > 0:
+    discard v.rend.renderDrawLines(pointsMin[0].addr, pointsMin.len)
+    discard v.rend.renderDrawLines(pointsMax[0].addr, pointsMax.len)
+    discard v.rend.renderDrawLines(pointsAvg[0].addr, pointsAvg.len)
 
   if graphRects.len > 0:
     col.a = 64
@@ -399,8 +398,6 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
     discard v.rend.renderFillRects(graphRects[0].addr, graphRects.len)
 
 
-
-# Draw the given group
 
 proc drawGroup(v: View, y: int, g: Group, labels: var seq[Label]): int =
 
@@ -513,7 +510,6 @@ proc drawData(v: View) =
       v.setColor(col)
       discard v.rend.renderFillRect(r.addr)
       discard v.rend.renderCopy(tt.tex, nil, r.addr)
-
 
 
 proc drawStatusbar(v: View, aps: AppStats) =

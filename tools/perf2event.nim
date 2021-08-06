@@ -22,7 +22,7 @@ let p = peg line:
     let time = $4
     let syscall = $6
 
-    echo time, " ", pid, ".", comm, "(", tid, ").", syscall, " ", prefix
+    echo time, " ", prefix, " ", pid, ".", comm, "(", tid, ").", syscall
 
     #echo $4 & " " & $2 & "." & $1 & "." & $3 & " " & $prefix & $6
   name <- +Graph
