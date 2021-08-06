@@ -74,6 +74,11 @@ type
   ViewStats = object
     renderTime: float
 
+  Label = object
+    text: string
+    x: int
+    y: int
+    col: Color
 
 # Misc helpers
 
@@ -276,226 +281,217 @@ proc measure(v: View, group: Group): (string, int) =
   result = (parts.join(", "), dutyCycle.int)
 
 
+
+# Draw all events for the given group
+
+proc drawEvents(v:View, g: Group, y: int, h: int) =
+
+  # precalulate stuff for value-to-y calculations
+
+  let
+    gv = v.groupView(g)
+    lo = g.vs.lo
+    hi = g.vs.hi
+    ppv = if lo != hi: h.float / (hi - lo) else: 0.0
+    logMin = log(max(lo, 1e-3), 10)
+    logMax = log(max(hi, 1e-3), 10)
+    ppvLog = h.float / (logMax - logMin)
+
+  proc val2y(val: float): int =
+    if gv.graphScale == gsLog:
+      y + h - int((log(max(val, 1e-3), 10) - logMin) * ppvLog).clamp(0, h)
+    else:
+      y + h - int((val - lo) * ppv).clamp(0, h)
+
+  # graph state
+  var
+    rects = newSeqOfCap[Rect](g.events.len)
+    graphRects = newSeqOfCap[Rect](g.events.len)
+    points: seq[Point]
+    prevX = int.low
+    vTot = 0.Value
+    nTot = 0
+  let
+    vMin = Value.high
+    vMax = Value.low
+
+  # Binary search for event indices which lie in the current view
+  var i1 = g.events.lowerbound(v.cfg.ts.lo, (e, t) => cmp(if e.ts.hi != NoTime: e.ts.hi else: e.ts.lo, t))
+  var i2 = g.events.upperbound(v.cfg.ts.hi, (e, t) => cmp(e.ts.lo, t))
+
+  if i1 > 0: dec i1
+  if i2 < g.events.len: inc i2
+
+  # Iterate visible events
+  for i in i1 ..< i2:
+
+    let e = g.events[i]
+
+    # Calculate x for event start and end time
+    var x1 = v.time2x(e.ts.lo)
+    var x2 = if e.ts.hi == NoTime or e.ts.hi == e.ts.lo:
+        x1 + 1 # Oneshot or incomplete span
+      else:
+        max(v.time2x(e.ts.hi), x1+1)
+
+    # Keep track of min, max and average of events with values
+    if e.kind in { ekCounter, ekGauge }:
+      vTot += e.value
+      inc nTot
+
+    # Only draw this event if it gets drawn on a different pixel then the
+    # previous event
+    if x2 > prevX:
+
+      # Never overlap over previous events
+      x1 = max(x1, prevX)
+
+      case e.kind
+
+        of ekOneshot, ekSpan:
+          # Draw event bar
+          rects.add Rect(x: x1, y: y, w: x2-x1, h: h)
+
+        of ekCounter, ekGauge:
+          # Events with a value get graphed
+          let vAvg = vTot / nTot.float
+          (vTot, nTot) = (0.0, 0)
+          var (y1, y2, yMax, yMin) = (vAvg.val2y, 0.val2y, vMax.val2y, vMin.val2y)
+          points.add Point(x: x1, y: y1)
+
+          assert yMax <= yMin
+          if yMax < y2 and yMin < y2:
+            yMax = min(yMax, yMin)
+            yMin = y2
+          if yMax > y2 and yMin > y2:
+            yMax = y2
+            yMin = max(yMax, yMin)
+          graphRects.add Rect(x: x1, y: y, w: x2-x1, h: h)
+
+      # Incomplete span gets a little arrow
+      if e.ts.hi == NoTime:
+        for i in 1..<h /% 2:
+          rects.add Rect(x: x1+i, y: y+i, w: 1, h: h-i*2)
+
+      # Check for hovering
+      if initSpan(y, y+h).contains(v.mouseY) and initSpan(x1, x2).contains(v.mouseX):
+        v.curEvent = e
+
+      # Always leave a gap of 1 pixel between event, this makese sure gaps do
+      # not go unnoticed, on any zoom level
+      prevX = x2 + 1
+
+  var col = v.groupColor(g)
+  v.setColor(col)
+
+  # Render all event rectangles
+  if rects.len > 0:
+    discard v.rend.renderFillRects(rects[0].addr, rects.len)
+
+  # Render graph events and lines
+
+  if points.len > 0:
+    discard v.rend.renderDrawLines(points[0].addr, points.len)
+
+  if graphRects.len > 0:
+    col.a = 64
+    v.setColor(col)
+    discard v.rend.renderFillRects(graphRects[0].addr, graphRects.len)
+
+
+
+# Draw the given group
+
+proc drawGroup(v: View, y: int, g: Group, labels: var seq[Label]): int =
+
+  var y = y
+  let gv = v.groupView(g)
+
+  if g != v.rootGroup and v.cfg.hideBin[gv.bin]:
+    for id, cg in g.groups:
+      y = v.drawGroup(y, cg, labels)
+    return y
+
+  #if not v.cfg.ts.overlaps(g.ts):
+  #  return
+
+  let isOpen = gv.isOpen
+  let yGroup = y
+  let rowSize = v.cfg.rowSize * pow(1.5, gv.height.float).int
+
+  # Horizontal separator
+  v.setColor(colGrid)
+  v.drawLine(0, y-1, v.w, y-1)
+
+  # Draw label and events for this group
+  var h = 0
+  var c = v.groupColor(g)
+  var arrow = ""
+  if g.groups.len > 0:
+    arrow = if isOpen: "▼ " else: "▶ "
+  labels.add Label(x: 0, y: y, text: repeat(" ", g.depth) & arrow & g.id & " ", col: c)
+  if g.events.len > 0:
+    h = rowSize
+    v.drawEvents(g, y + 3, h-4)
+
+  # Draw measurements for this group
+  if v.tMeasure != NoTime:
+    var col = v.groupColor(g)
+    let (label, duty) = v.measure(g)
+    let x1 = v.time2x(v.tMeasure)
+    let x2 = v.mouse_x
+    labels.add Label(x: x2+2, y: y, text: label & " ", col: colEvent)
+    v.setColor(col)
+    v.drawFillRect(x1, y, x1-duty, y+h)
+    col = sdl.Color(r: 0, g: 0, b: 0, a:255)
+    v.setColor(col)
+    v.drawFillRect(x1-duty, y, x1-100, y+h)
+
+  y += h
+
+  # For closed groups, draw a (limited) birds eye overview of all events under this group
+  if not isOpen and g.groups.len > 0:
+    var n = 0
+    proc aux(g: Group) =
+      if g.events.len > 0:
+        let ts1 = g.events[0].ts.lo
+        let ts2 = g.events[^1].ts.hi
+        if ts1 < v.cfg.ts.hi and (ts2 == NoTime or ts2 > v.cfg.ts.lo):
+          v.drawEvents(g, y, 1)
+          inc y, 2
+          inc n
+      if n < rowSize:
+        for id, cg in g.groups:
+          aux(cg)
+    aux(g)
+
+  y = max(y, yGroup + v.cfg.rowSize) + 3
+
+  if isOpen:
+    for id, cg in g.groups:
+      y = v.drawGroup(y, cg, labels)
+
+  # Check for mouse hover
+  if v.mouseY >= yGroup and v.mouseY < y:
+    if v.curGroup == nil:
+      v.curGroup = g
+    v.setColor(colGroupSel)
+    v.drawFillRect(0, yGroup, v.w, y-1)
+
+  return y
+
+
+
 proc drawData(v: View) =
 
   v.curGroup = nil
   v.curEvent.ts.lo = NoTime
 
-  type Label = object
-    text: string
-    x: int
-    y: int
-    col: Color
-
-  var labels: seq[Label]
-
-  # Draw events
-
-  proc drawEvents(g: Group, y: int, h: int) =
-
-    # precalulate stuff for value-to-y calculations
-
-    let
-      gv = v.groupView(g)
-      lo = g.vs.lo
-      hi = g.vs.hi
-      ppv = if lo != hi: h.float / (hi - lo) else: 0.0
-      logMin = log(max(lo, 1e-3), 10)
-      logMax = log(max(hi, 1e-3), 10)
-      ppvLog = h.float / (logMax - logMin)
-
-    proc val2y(val: float): int =
-      if gv.graphScale == gsLog:
-        y + h - int((log(max(val, 1e-3), 10) - logMin) * ppvLog).clamp(0, h)
-      else:
-        y + h - int((val - lo) * ppv).clamp(0, h)
-
-    # graph state
-    var
-      rects = newSeqOfCap[Rect](g.events.len)
-      graphRects = newSeqOfCap[Rect](g.events.len)
-      points: seq[Point]
-      prevX = int.low
-
-      vMin = Value.high
-      vMax = Value.low
-      vTot = 0.Value
-      nTot = 0
-
-    # Binary search for event indices which lie in the current view
-    var i1 = g.events.lowerbound(v.cfg.ts.lo, (e, t) => cmp(if e.ts.hi != NoTime: e.ts.hi else: e.ts.lo, t))
-    var i2 = g.events.upperbound(v.cfg.ts.hi, (e, t) => cmp(e.ts.lo, t))
-
-    if i1 > 0: dec i1
-    if i2 < g.events.len: inc i2
-
-    # Iterate visible events
-    for i in i1 ..< i2:
-
-      let e = g.events[i]
-
-      # Calculate x for event start and end time
-      var x1 = v.time2x(e.ts.lo)
-      var x2 = if e.ts.hi == NoTime or e.ts.hi == e.ts.lo:
-          x1 + 1 # Oneshot or incomplete span
-        else:
-          max(v.time2x(e.ts.hi), x1+1)
-
-      # Keep track of min, max and average of events with values
-      if e.kind in { ekCounter, ekGauge }:
-        vMin = min(vMin, e.value)
-        vMax = max(vMax, e.value)
-        vTot += e.value
-        inc nTot
-
-      # Only draw this event if it gets drawn on a different pixel then the
-      # previous event
-      if x2 > prevX:
-
-        # Never overlap over previous events
-        x1 = max(x1, prevX)
-
-        case e.kind
-
-          of ekOneshot, ekSpan:
-            # Draw event bar
-            rects.add Rect(x: x1, y: y, w: x2-x1, h: h)
-
-          of ekCounter, ekGauge:
-            # Events with a value get graphed
-            let vAvg = vTot / nTot.float
-            (vTot, nTot) = (0.0, 0)
-            var (y1, y2, yMax, yMin) = (vAvg.val2y, 0.val2y, vMax.val2y, vMin.val2y)
-            points.add Point(x: x1, y: y1)
-
-            assert yMax <= yMin
-            if yMax < y2 and yMin < y2:
-              yMax = min(yMax, yMin)
-              yMin = y2
-            if yMax > y2 and yMin > y2:
-              yMax = y2
-              yMin = max(yMax, yMin)
-            #graphRects.add Rect(x: x1, y: y1, w: x2-x1, h: y2-y1)
-            graphRects.add Rect(x: x1, y: y, w: x2-x1, h: h)
-
-            vmin = Value.high
-            vMax = Value.low
-
-        # Incomplete span gets a little arrow
-        if e.ts.hi == NoTime:
-          for i in 1..<h /% 2:
-            rects.add Rect(x: x1+i, y: y+i, w: 1, h: h-i*2)
-
-        # Check for hovering
-        if initSpan(y, y+h).contains(v.mouseY) and initSpan(x1, x2).contains(v.mouseX):
-          v.curEvent = e
-
-        # Always leave a gap of 1 pixel between event, this makese sure gaps do
-        # not go unnoticed, on any zoom level
-        prevX = x2 + 1
-
-    var col = v.groupColor(g)
-    v.setColor(col)
-
-    # Render all event rectangles
-    if rects.len > 0:
-      discard v.rend.renderFillRects(rects[0].addr, rects.len)
-
-    # Render graph events and lines
-
-    if points.len > 0:
-      discard v.rend.renderDrawLines(points[0].addr, points.len)
-
-    if graphRects.len > 0:
-      col.a = 64
-      v.setColor(col)
-      discard v.rend.renderFillRects(graphRects[0].addr, graphRects.len)
-
-
-
-  # Draw groups
-
-  var y = v.cfg.yTop + 20
-
-  proc drawGroup(g: Group) =
-
-    let gv = v.groupView(g)
-
-    if g != v.rootGroup and v.cfg.hideBin[gv.bin]:
-      for id, cg in g.groups:
-        drawGroup(cg)
-      return
-
-    #if not v.cfg.ts.overlaps(g.ts):
-    #  return
-
-    let isOpen = gv.isOpen
-    let yGroup = y
-    let rowSize = v.cfg.rowSize * pow(1.5, gv.height.float).int
-
-    # Horizontal separator
-    v.setColor(colGrid)
-    v.drawLine(0, y-1, v.w, y-1)
-
-    # Draw label and events for this group
-    var h = 0
-    var c = v.groupColor(g)
-    var arrow = ""
-    if g.groups.len > 0:
-      arrow = if isOpen: "▼ " else: "▶ "
-    labels.add Label(x: 0, y: y, text: repeat(" ", g.depth) & arrow & g.id & " ", col: c)
-    if g.events.len > 0:
-      h = rowSize
-      drawEvents(g, y + 3, h-4)
-
-    # Draw measurements for this group
-    if v.tMeasure != NoTime:
-      var col = v.groupColor(g)
-      let (label, duty) = v.measure(g)
-      let x1 = v.time2x(v.tMeasure)
-      let x2 = v.mouse_x
-      labels.add Label(x: x2+2, y: y, text: label & " ", col: colEvent)
-      v.setColor(col)
-      v.drawFillRect(x1, y, x1-duty, y+h)
-      col = sdl.Color(r: 0, g: 0, b: 0, a:255)
-      v.setColor(col)
-      v.drawFillRect(x1-duty, y, x1-100, y+h)
-
-    y += h
-
-    # For closed groups, draw a (limited) birds eye overview of all events under this group
-    if not isOpen and g.groups.len > 0:
-      var n = 0
-      proc aux(g: Group) =
-        if g.events.len > 0:
-          let ts1 = g.events[0].ts.lo
-          let ts2 = g.events[^1].ts.hi
-          if ts1 < v.cfg.ts.hi and (ts2 == NoTime or ts2 > v.cfg.ts.lo):
-            drawEvents(g, y, 1)
-            inc y, 2
-            inc n
-        if n < rowSize:
-          for id, cg in g.groups:
-            aux(cg)
-      aux(g)
-
-    y = max(y, yGroup + v.cfg.rowSize) + 3
-
-    if isOpen:
-      for id, cg in g.groups:
-        drawGroup(cg)
-
-    # Check for mouse hover
-    if v.mouseY >= yGroup and v.mouseY < y:
-      if v.curGroup == nil:
-        v.curGroup = g
-      v.setColor(colGroupSel)
-      v.drawFillRect(0, yGroup, v.w, y-1)
-
-
   # Recursively draw all groups
 
-  drawGroup(v.rootGroup)
+  var y = v.cfg.yTop + 20
+  var labels: seq[Label]
+  discard v.drawGroup(y, v.rootGroup, labels)
 
   # Draw evdata for current event
 
@@ -517,6 +513,7 @@ proc drawData(v: View) =
       v.setColor(col)
       discard v.rend.renderFillRect(r.addr)
       discard v.rend.renderCopy(tt.tex, nil, r.addr)
+
 
 
 proc drawStatusbar(v: View, aps: AppStats) =
