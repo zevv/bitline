@@ -139,72 +139,145 @@ proc drawGrid(v: View) =
 
   let
     y1 = v.cfg.rowSize + 2
-    y2 = v.h - v.cfg.rowSize * 2
+    y2 = v.h - v.cfg.rowSize * 2 - 7
     y4 = v.h - v.cfg.rowSize * 1 - 4
 
   v.setColor(colGrid)
   v.drawLine(0, y1, v.w, y1)
   v.drawLine(0, y4, v.w, y4)
-  
+
   if v.tMeasure != NoTime:
     return
 
-  proc aux(tFrom: DateTime, step: Duration, fmts1, fmts2: string) =
-    var
-      dt = inMilliseconds(step).float / 1000.0
-      t = tFrom
-      tTo = v.cfg.ts.hi.fromUnixFloat.utc
-      dtw = v.w.float * dt / v.cfg.ts.duration
-   
-    if dtw > 5 and dtw < v.w.float * 10:
+  let dt = v.cfg.ts.hi - v.cfg.ts.lo
+  let tpp = dt / v.w.Time
+  let tFrom = v.cfg.ts.lo.fromUnixFloat.utc
+  let tTo = v.cfg.ts.hi.fromUnixFloat.utc
 
-      let alpha = clamp(dtw+32, 0, 255).uint8
-      let dy = -sqrt(dtw).int.clamp(0, v.cfg.rowSize*2)
+  template aux(interval: Time,
+               iyear: int, imonth: Month, imday: MonthdayRange,
+               ihour, imin, isec: int, insec: int,
+               fmt: string,
+               code: untyped) {.dirty.} =
 
-      while t < tTo:
-        let x = v.time2x(t.toTime.toUnixFloat)
-        if x > -80 and x < v.w:
-          var l: string
-          if dtw > 100:
-            l.add t.format(fmts1)
-          if dtw > 50:
-            l.add t.format(fmts2)
-          var col = colTicks
-          col.a = alpha
-          v.setColor col
-          v.drawText(x+2, y2 + dy, l, col)
-
-          col = colGrid
-          col.a = alpha
-          v.setColor col
+    if tpp * 4 < interval:
+      var year = iyear
+      var month = imonth.int
+      var mday = imday.int
+      var hour = ihour.int
+      var min = imin.int
+      var sec = isec.int
+      var nsec = insec.int
+      while true:
+        let t = initDateTime(mday.MonthDayRange, month.Month, year, hour, min, sec, nsec, utc())
+        if t > tTo:
+          break
+        if t > tFrom:
+          let x = v.time2x(t.toTime.toUnixFloat)
+          v.setColor colGrid
           v.drawLine(x, y1, x, y4)
-        t += step
+
+          let l = t.format(fmt)
+          if l != "":
+            echo v.w.float * interval / dt
+            v.drawText(x+2, y2, l, colTicks)
+
+        code
+
+
+        if nsec >= 1000000000:
+          inc sec
+          nsec = 0
+        if sec >= 60:
+          inc min
+          sec = 0
+        if min >= 60:
+          inc hour
+          min = 0
+        if hour >= 24:
+          hour = 0
+          inc mday
+        if month < 13 and mday > getDaysInMonth(month.Month, year):
+          mday = 1
+          inc month
+        if month > 12:
+          month = 1
+          inc year
+
+
 
   let t = v.cfg.ts.lo.fromUnixFloat.utc
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
-      initDuration(milliseconds=1), "hh:mm:ss'.'", "fff")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
-      initduration(milliseconds=10), "hh:mm:ss'.'", "fff")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
-      initDuration(milliseconds=100), "hh:mm:ss'.'", "fff")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
-      initDuration(seconds=1), "HH:mm:", "ss")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
-      initDuration(seconds=10), "HH:mm:", "ss")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
-      initDuration(minutes=1), "HH:", "mm:ss")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
-      initDuration(minutes=10), "ddd ", "HH:mm:ss")
-  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=0, minute=0, second=0, utc()),
-      initduration(hours=1), "ddd ", "HH:mm")
-  aux(initDateTime(year=t.year, month=t.month, monthday=1, hour=0, minute=0, second=0, utc()),
-      initduration(days=1), "MMM ddd ", " HH:mm")
-  aux(initDateTime(year=t.year, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()),
-      initDuration(weeks=4), "yyyy ", "MMM")
-  aux(initDateTime(year=1970, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()),
-      initDuration(weeks=52), "", "yyyy")
+  aux(60*60*24*365, t.year, mJan,    1,          0,      0,        0,        0, "yyyy"): inc year
+  aux(60*60*24*30,  t.year, t.month, 1,          0,      0,        0,        0, ""): inc month
+  aux(60*60*24,     t.year, t.month, t.monthday, 0,      0,        0,        0, ""): inc mday
+  aux(60*60,        t.year, t.month, t.monthday, t.hour, 0,        0,        0, ""): inc hour
+  aux(60,           t.year, t.month, t.monthday, t.hour, t.minute, 0,        0, ""): inc min
+  aux(1,            t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, ""): inc sec
+  aux(0.1,          t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, ""): inc nsec, 100 * 1000 * 1000
+  aux(0.01,         t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, ""): inc nsec,  10 * 1000 * 1000
+  aux(0.001,        t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, ""): inc nsec,   1 * 1000 * 1000
+  #aux(60*60   , t.year, t.month, t.monthday, t.hour, 0, 0): inc hour
 
-
+#  return
+#  proc aux(tFrom: DateTime, step: Duration, fmts1, fmts2: string) =
+#    var
+#      dt = inMilliseconds(step).float / 1000.0
+#      t = tFrom
+#      tTo = v.cfg.ts.hi.fromUnixFloat.utc
+#      dtw = v.w.float * dt / v.cfg.ts.duration
+#
+#    if dtw > 5 and dtw < v.w.float * 10:
+#
+#      let alpha = clamp(dtw+32, 0, 255).uint8
+#      let dy = -sqrt(dtw).int.clamp(0, v.cfg.rowSize*2)
+#
+#      while t < tTo:
+#        let x = v.time2x(t.toTime.toUnixFloat)
+#        if x > -80 and x < v.w:
+#
+#          var col = colTicks
+#          col.a = alpha
+#          v.setColor col
+#
+#          var l: string
+#          if dtw > 100:
+#            l = t.format(fmts2)
+#          elif dtw > 50:
+#            l = t.format(fmts1)
+#          if l != "":
+#            v.drawText(x+2, y2 + dy, l, col)
+#
+#          col = colGrid
+#          col.a = alpha
+#          v.setColor col
+#          v.drawLine(x, y1, x, y4)
+#        t += step
+#
+#  let t = v.cfg.ts.lo.fromUnixFloat.utc
+#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
+#      initDuration(milliseconds=1), "hh:mm:ss'.'", "fff")
+#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
+#      initduration(milliseconds=10), "hh:mm:ss'.'", "fff")
+#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
+#      initDuration(milliseconds=100), "hh:mm:ss'.'", "fff")
+#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
+#      initDuration(seconds=1), "HH:mm:", "ss")
+#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
+#      initDuration(seconds=10), "HH:mm:", "ss")
+#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
+#      initDuration(minutes=1), "HH:", "mm:ss")
+#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
+#      initDuration(minutes=10), "ddd ", "HH:mm:ss")
+#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=0, minute=0, second=0, utc()),
+#      initduration(hours=1), "ddd ", "HH:mm")
+#  aux(initDateTime(year=t.year, month=t.month, monthday=1, hour=0, minute=0, second=0, utc()),
+#      initduration(days=1), "MMM ddd ", " HH:mm")
+#  aux(initDateTime(year=t.year, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()),
+#      initDuration(weeks=4), "yyyy ", "yyyy MMM")
+#  aux(initDateTime(year=1970, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()),
+#      initDuration(days=365), "yy", "yyyy")
+#
+#
 proc drawCursor(v: View) =
   let
     x = v.mouseX
