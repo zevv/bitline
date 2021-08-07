@@ -21,7 +21,8 @@ import misc
 
 const
   colBg           = sdl.Color(r:  0, g:  0, b: 16, a:255)
-  colGrid         = sdl.Color(r:196, g:196, b:196, a: 96)
+  colGrid         = sdl.Color(r:128, g:128, b:128, a: 96)
+  colTicks        = sdl.Color(r:196, g:196, b:196, a:196)
   colCursor       = sdl.Color(r:255, g:128, b:128, a:255)
   colMeasure      = sdl.Color(r:255, g:255, b:  0, a: 32)
   colGroupSel     = sdl.Color(r:255, g:255, b:255, a:  8)
@@ -138,8 +139,7 @@ proc drawGrid(v: View) =
 
   let
     y1 = v.cfg.rowSize + 2
-    y2 = v.h - v.cfg.rowSize * 3 - 5
-    y3 = v.h - v.cfg.rowSize * 2 - 5
+    y2 = v.h - v.cfg.rowSize * 2
     y4 = v.h - v.cfg.rowSize * 1 - 4
 
   v.setColor(colGrid)
@@ -155,46 +155,54 @@ proc drawGrid(v: View) =
       t = tFrom
       tTo = v.cfg.ts.hi.fromUnixFloat.utc
       dtw = v.w.float * dt / v.cfg.ts.duration
-      alpha = uint8 min( 64, dtw)
+   
+    if dtw > 5 and dtw < v.w.float * 10:
 
-    var col = colGrid
-    col.a = alpha
-    v.setColor col
+      let alpha = clamp(dtw+32, 0, 255).uint8
+      let dy = -sqrt(dtw).int.clamp(0, v.cfg.rowSize*2)
 
-    if dtw > 5 and dtw < v.w.float:
       while t < tTo:
         let x = v.time2x(t.toTime.toUnixFloat)
         if x > -80 and x < v.w:
+          var l: string
+          if dtw > 100:
+            l.add t.format(fmts1)
+          if dtw > 50:
+            l.add t.format(fmts2)
+          var col = colTicks
+          col.a = alpha
+          v.setColor col
+          v.drawText(x+2, y2 + dy, l, col)
+
+          col = colGrid
+          col.a = alpha
+          v.setColor col
           v.drawLine(x, y1, x, y4)
-          if dtw > 80:
-            v.drawText(x+2, y2, t.format(fmts1), col)
-          if dtw > 20:
-            v.drawText(x+2, y3, t.format(fmts2), col)
         t += step
 
   let t = v.cfg.ts.lo.fromUnixFloat.utc
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
-      initDuration(milliseconds=1), "hh:mm:ss", "fff")
+      initDuration(milliseconds=1), "hh:mm:ss'.'", "fff")
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
-      initduration(milliseconds=10), "hh:mm:ss", "fff")
+      initduration(milliseconds=10), "hh:mm:ss'.'", "fff")
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
-      initDuration(milliseconds=100), "hh:mm:ss", "fff")
+      initDuration(milliseconds=100), "hh:mm:ss'.'", "fff")
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
-      initDuration(seconds=1), "HH:mm:ss", "ss")
+      initDuration(seconds=1), "HH:mm:", "ss")
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
-      initDuration(seconds=10), "HH:mm:ss", "ss")
+      initDuration(seconds=10), "HH:mm:", "ss")
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
-      initDuration(minutes=1), "HH:mm:ss", "mm")
+      initDuration(minutes=1), "HH:", "mm:ss")
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
-      initDuration(minutes=10), "HH:mm", "mm")
+      initDuration(minutes=10), "ddd ", "HH:mm:ss")
   aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=0, minute=0, second=0, utc()),
-      initduration(hours=1), "HH:mm", "HH")
+      initduration(hours=1), "ddd ", "HH:mm")
   aux(initDateTime(year=t.year, month=t.month, monthday=1, hour=0, minute=0, second=0, utc()),
-      initduration(days=1), "ddd dd-MM", "dd")
+      initduration(days=1), "MMM ddd ", " HH:mm")
   aux(initDateTime(year=t.year, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()),
-      initDuration(weeks=4), "MMM yyyy", "MMM")
+      initDuration(weeks=4), "yyyy ", "MMM")
   aux(initDateTime(year=1970, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()),
-      initDuration(weeks=52), "yyyy", "MMM")
+      initDuration(weeks=52), "", "yyyy")
 
 
 proc drawCursor(v: View) =
@@ -333,9 +341,10 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
   proc emit() =
     case kind
-      of ekOneshot, ekSpan:
+      of ekOneshot:
+        rects.add Rect(x: x1Cur, y: y, w: 1, h: h)
+      of ekSpan:
         rects.add Rect(x: x1Cur, y: y, w: x2Cur-x1Cur+1, h: h)
-
       of ekCounter, ekGauge:
         graphRects.add Rect(x: x1Cur, y: y, w: x2Cur-x1Cur+1, h: h)
         pointsAvg.add Point(x: x1Cur, y: val2y(vTot / nTot))
