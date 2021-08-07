@@ -157,11 +157,11 @@ proc drawGrid(v: View) =
   template aux(interval: Time,
                iyear: int, imonth: Month, imday: MonthdayRange,
                ihour, imin, isec: int, insec: int,
-               fmt: string,
+               fmt1, fmt2: string,
                code: untyped) {.dirty.} =
 
     if tpp * 4 < interval:
-      var year = iyear
+      var year = iyear.int
       var month = imonth.int
       var mday = imday.int
       var hour = ihour.int
@@ -173,17 +173,23 @@ proc drawGrid(v: View) =
         if t > tTo:
           break
         if t > tFrom:
-          let x = v.time2x(t.toTime.toUnixFloat)
-          v.setColor colGrid
+          let
+            dx = v.w.float * interval / dt
+            dy = (log2(dx) * 5).int - 30  # magic numbers
+            x = v.time2x(t.toTime.toUnixFloat)
+
+          var col = colTicks
+          col.a = dx.clamp(0, 255).uint8
+          
+          v.setColor col
           v.drawLine(x, y1, x, y4)
 
-          let l = t.format(fmt)
-          if l != "":
-            echo v.w.float * interval / dt
-            v.drawText(x+2, y2, l, colTicks)
+          if dx > 100:
+            v.drawText(x+2, y2 - dy, t.format(fmt2), col)
+          elif dx > 30:
+            v.drawText(x+2, y2 - dy, t.format(fmt1), col)
 
         code
-
 
         if nsec >= 1000000000:
           inc sec
@@ -204,18 +210,19 @@ proc drawGrid(v: View) =
           month = 1
           inc year
 
-
-
   let t = v.cfg.ts.lo.fromUnixFloat.utc
-  aux(60*60*24*365, t.year, mJan,    1,          0,      0,        0,        0, "yyyy"): inc year
-  aux(60*60*24*30,  t.year, t.month, 1,          0,      0,        0,        0, ""): inc month
-  aux(60*60*24,     t.year, t.month, t.monthday, 0,      0,        0,        0, ""): inc mday
-  aux(60*60,        t.year, t.month, t.monthday, t.hour, 0,        0,        0, ""): inc hour
-  aux(60,           t.year, t.month, t.monthday, t.hour, t.minute, 0,        0, ""): inc min
-  aux(1,            t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, ""): inc sec
-  aux(0.1,          t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, ""): inc nsec, 100 * 1000 * 1000
-  aux(0.01,         t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, ""): inc nsec,  10 * 1000 * 1000
-  aux(0.001,        t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, ""): inc nsec,   1 * 1000 * 1000
+  aux(60*60*24*365, t.year, mJan,    1,          0,      0,        0,        0, "yy", "yyyy"): inc year
+  aux(60*60*24*30,  t.year, t.month, 1,          0,      0,        0,        0, "MMM", "MMM '`'yy"): inc month
+  aux(60*60*24,     t.year, t.month, t.monthday, 0,      0,        0,        0, "dd", "MMM dd"): inc mday
+  aux(60*60*6,      t.year, t.month, t.monthday, 0,      0,        0,        0, "HH", "HH:mm"): inc hour, 6
+  aux(60*60,        t.year, t.month, t.monthday, t.hour, 0,        0,        0, "HH", "HH:mm"): inc hour
+  aux(60*10,        t.year, t.month, t.monthday, t.hour, 0,        0,        0, "mm", "HH:mm"): inc min, 10
+  aux(60,           t.year, t.month, t.monthday, t.hour, t.minute, 0,        0, "mm", "HH:mm:ss"): inc min
+  aux(10,           t.year, t.month, t.monthday, t.hour, t.minute, 0,        0, "ss", "HH:mm:ss"): inc sec, 10
+  aux(1,            t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, "ss", "HH:mm:ss"): inc sec
+  aux(0.1,          t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, "fff", "ss'.'fff"): inc nsec, 100 * 1000 * 1000
+  aux(0.01,         t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, "fff", "ss'.'fff"): inc nsec,  10 * 1000 * 1000
+  aux(0.001,        t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, "fff", "ss'.'fff"): inc nsec,   1 * 1000 * 1000
   #aux(60*60   , t.year, t.month, t.monthday, t.hour, 0, 0): inc hour
 
 #  return
@@ -413,18 +420,20 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
     vTot, vMin, vMax, nTot: Value
 
   proc emit() =
+    var x1 = x1Cur.clamp(-1, v.w)
+    var x2 = x2Cur.clamp(-1, v.w)
     case kind
       of ekOneshot:
-        rects.add Rect(x: x1Cur, y: y, w: 1, h: h)
+        rects.add Rect(x: x1, y: y, w: 1, h: h)
       of ekSpan:
-        rects.add Rect(x: x1Cur, y: y, w: x2Cur-x1Cur+1, h: h)
+        rects.add Rect(x: x1, y: y, w: x2-x1+1, h: h)
       of ekCounter, ekGauge:
-        graphRects.add Rect(x: x1Cur, y: y, w: x2Cur-x1Cur+1, h: h)
-        pointsAvg.add Point(x: x1Cur, y: val2y(vTot / nTot))
+        graphRects.add Rect(x: x1, y: y, w: x2-x1+1, h: h)
+        pointsAvg.add Point(x: x1, y: val2y(vTot / nTot))
         if nTot > 1:
           let yMin = vMin.val2Y
           let yMax = vMax.val2Y
-          graphRects.add Rect(x: x1Cur, y: yMax, w: x2Cur-x1Cur+1, h: yMin-yMax)
+          graphRects.add Rect(x: x1, y: yMax, w: x2-x1+1, h: yMin-yMax)
 
   while i < i2:
 
