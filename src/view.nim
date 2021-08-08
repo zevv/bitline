@@ -153,6 +153,7 @@ proc drawGrid(v: View) =
   let tpp = dt / v.w.Time
   let tFrom = v.cfg.ts.lo.fromUnixFloat.utc
   let tTo = v.cfg.ts.hi.fromUnixFloat.utc
+  var dy = 0
 
   template aux(interval: Time,
                iyear: int, imonth: Month, imday: MonthdayRange,
@@ -160,14 +161,10 @@ proc drawGrid(v: View) =
                fmt1, fmt2: string,
                code: untyped) {.dirty.} =
 
-    if tpp * 4 < interval:
-      var year = iyear.int
-      var month = imonth.int
-      var mday = imday.int
-      var hour = ihour.int
-      var min = imin.int
-      var sec = isec.int
-      var nsec = insec.int
+    if tpp * 10 < interval:
+      var (year, month, mday)= (iyear.int, imonth.int, imday.int)
+      var (hour, min, sec, nsec) = (ihour.int, imin.int, isec.int, insec.int)
+      var nLabels = 0
       while true:
         let t = initDateTime(mday.MonthDayRange, month.Month, year, hour, min, sec, nsec, utc())
         if t > tTo:
@@ -175,7 +172,6 @@ proc drawGrid(v: View) =
         if t > tFrom:
           let
             dx = v.w.float * interval / dt
-            dy = (log2(dx) * 5).int - 30  # magic numbers
             x = v.time2x(t.toTime.toUnixFloat)
 
           var col = colTicks
@@ -183,11 +179,15 @@ proc drawGrid(v: View) =
           
           v.setColor col
           v.drawLine(x, y1, x, y4)
+          var l: string
 
           if dx > 100:
-            v.drawText(x+2, y2 - dy, t.format(fmt2), col)
+            l = t.format(fmt2)
           elif dx > 30:
-            v.drawText(x+2, y2 - dy, t.format(fmt1), col)
+            l = t.format(fmt1)
+          if l != "":
+            v.drawText(x+2, y2 - dy, l, col)
+            inc nLabels
 
         code
 
@@ -209,82 +209,23 @@ proc drawGrid(v: View) =
         if month > 12:
           month = 1
           inc year
+      if nLabels > 0:
+        dy += v.cfg.rowSize
 
   let t = v.cfg.ts.lo.fromUnixFloat.utc
-  aux(60*60*24*365, t.year, mJan,    1,          0,      0,        0,        0, "yy", "yyyy"): inc year
-  aux(60*60*24*30,  t.year, t.month, 1,          0,      0,        0,        0, "MMM", "MMM '`'yy"): inc month
-  aux(60*60*24,     t.year, t.month, t.monthday, 0,      0,        0,        0, "dd", "MMM dd"): inc mday
-  aux(60*60*6,      t.year, t.month, t.monthday, 0,      0,        0,        0, "HH", "HH:mm"): inc hour, 6
-  aux(60*60,        t.year, t.month, t.monthday, t.hour, 0,        0,        0, "HH", "HH:mm"): inc hour
-  aux(60*10,        t.year, t.month, t.monthday, t.hour, 0,        0,        0, "mm", "HH:mm"): inc min, 10
-  aux(60,           t.year, t.month, t.monthday, t.hour, t.minute, 0,        0, "mm", "HH:mm:ss"): inc min
-  aux(10,           t.year, t.month, t.monthday, t.hour, t.minute, 0,        0, "ss", "HH:mm:ss"): inc sec, 10
-  aux(1,            t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, "ss", "HH:mm:ss"): inc sec
-  aux(0.1,          t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, "fff", "ss'.'fff"): inc nsec, 100 * 1000 * 1000
-  aux(0.01,         t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, "fff", "ss'.'fff"): inc nsec,  10 * 1000 * 1000
   aux(0.001,        t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, "fff", "ss'.'fff"): inc nsec,   1 * 1000 * 1000
-  #aux(60*60   , t.year, t.month, t.monthday, t.hour, 0, 0): inc hour
+  aux(0.01,         t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, "fff", "ss'.'fff"): inc nsec,  10 * 1000 * 1000
+  aux(0.1,          t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, "fff", "ss'.'fff"): inc nsec, 100 * 1000 * 1000
+  aux(1,            t.year, t.month, t.monthday, t.hour, t.minute, t.second, 0, "ss", "HH:mm:ss"): inc sec
+  aux(10,           t.year, t.month, t.monthday, t.hour, t.minute, 0,        0, "ss", "HH:mm:ss"): inc sec, 10
+  aux(60,           t.year, t.month, t.monthday, t.hour, t.minute, 0,        0, "mm", "HH:mm:ss"): inc min
+  aux(60*10,        t.year, t.month, t.monthday, t.hour, 0,        0,        0, "mm", "HH:mm"): inc min, 10
+  aux(60*60,        t.year, t.month, t.monthday, t.hour, 0,        0,        0, "HH", "HH:mm"): inc hour
+  aux(60*60*6,      t.year, t.month, t.monthday, 0,      0,        0,        0, "HH", "HH:mm"): inc hour, 6
+  aux(60*60*24,     t.year, t.month, t.monthday, 0,      0,        0,        0, "dd", "MMM dd"): inc mday
+  aux(60*60*24*30,  t.year, t.month, 1,          0,      0,        0,        0, "MMM", "MMM '`'yy"): inc month
+  aux(60*60*24*365, t.year, mJan,    1,          0,      0,        0,        0, "yy", "yyyy"): inc year
 
-#  return
-#  proc aux(tFrom: DateTime, step: Duration, fmts1, fmts2: string) =
-#    var
-#      dt = inMilliseconds(step).float / 1000.0
-#      t = tFrom
-#      tTo = v.cfg.ts.hi.fromUnixFloat.utc
-#      dtw = v.w.float * dt / v.cfg.ts.duration
-#
-#    if dtw > 5 and dtw < v.w.float * 10:
-#
-#      let alpha = clamp(dtw+32, 0, 255).uint8
-#      let dy = -sqrt(dtw).int.clamp(0, v.cfg.rowSize*2)
-#
-#      while t < tTo:
-#        let x = v.time2x(t.toTime.toUnixFloat)
-#        if x > -80 and x < v.w:
-#
-#          var col = colTicks
-#          col.a = alpha
-#          v.setColor col
-#
-#          var l: string
-#          if dtw > 100:
-#            l = t.format(fmts2)
-#          elif dtw > 50:
-#            l = t.format(fmts1)
-#          if l != "":
-#            v.drawText(x+2, y2 + dy, l, col)
-#
-#          col = colGrid
-#          col.a = alpha
-#          v.setColor col
-#          v.drawLine(x, y1, x, y4)
-#        t += step
-#
-#  let t = v.cfg.ts.lo.fromUnixFloat.utc
-#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
-#      initDuration(milliseconds=1), "hh:mm:ss'.'", "fff")
-#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
-#      initduration(milliseconds=10), "hh:mm:ss'.'", "fff")
-#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
-#      initDuration(milliseconds=100), "hh:mm:ss'.'", "fff")
-#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=t.minute, second=0, utc()),
-#      initDuration(seconds=1), "HH:mm:", "ss")
-#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
-#      initDuration(seconds=10), "HH:mm:", "ss")
-#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
-#      initDuration(minutes=1), "HH:", "mm:ss")
-#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=t.hour, minute=0, second=0, utc()),
-#      initDuration(minutes=10), "ddd ", "HH:mm:ss")
-#  aux(initDateTime(year=t.year, month=t.month, monthday=t.monthday, hour=0, minute=0, second=0, utc()),
-#      initduration(hours=1), "ddd ", "HH:mm")
-#  aux(initDateTime(year=t.year, month=t.month, monthday=1, hour=0, minute=0, second=0, utc()),
-#      initduration(days=1), "MMM ddd ", " HH:mm")
-#  aux(initDateTime(year=t.year, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()),
-#      initDuration(weeks=4), "yyyy ", "yyyy MMM")
-#  aux(initDateTime(year=1970, month=mJan, monthday=1, hour=0, minute=0, second=0, utc()),
-#      initDuration(days=365), "yy", "yyyy")
-#
-#
 proc drawCursor(v: View) =
   let
     x = v.mouseX
@@ -858,9 +799,9 @@ proc sdlEvent*(v: View, e: sdl.Event) =
             if v.curGroup != nil:
               v.setBin(v.curGroup, bin)
         of sdl.K_COMMA:
-          v.zoomX 1.0/0.9
+          v.zoomX 1.0/0.8
         of sdl.K_PERIOD:
-          v.zoomX 0.9
+          v.zoomX 0.8
         of sdl.K_LEFT:
           v.panX -50
         of sdl.K_RIGHT:
