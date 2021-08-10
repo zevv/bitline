@@ -13,6 +13,7 @@ proc usage*(): string = """
 keys:
  a             zoom all
  c /o          close all / open all
+ f             toggle real time follow
  l             toggle log scale for graphs"
  q             quit
  s             save session view

@@ -46,6 +46,7 @@ type
     ts: TimeSpan
     groupViews: Table[string, GroupView]
     hideBin: array[10, bool]
+    follow: bool
 
   View* = ref object
     cfg: ViewConfig
@@ -67,6 +68,7 @@ type
     rend: sdl.Renderer
     textCache: TextCache
     cmdLine: CmdLine
+    tNow: uint32
 
   CmdLine = ref object
     active: bool
@@ -780,6 +782,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.zoomAll()
         of sdl.K_c:
           v.closeAll()
+        of sdl.K_f:
+          v.cfg.follow = not v.cfg.follow
         of sdl.K_o:
           v.openAll()
         of sdl.K_1..sdl.K_9:
@@ -902,5 +906,16 @@ proc sdlEvent*(v: View, e: sdl.Event) =
     else:
       discard
 
+
+proc tick*(v: View): bool =
+  let tNow = sdl.getTicks()
+  if v.cfg.follow:
+    result = true
+    sleep 10
+    if v.tNow != 0:
+      let dt = (tNow - v.tNow).float / 1000.0
+      v.cfg.ts.lo += dt
+      v.cfg.ts.hi += dt
+  v.tNow = tNow
 
 # vi: ft=nim sw=2 ts=2

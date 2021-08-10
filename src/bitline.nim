@@ -155,6 +155,10 @@ proc run*(app: App): bool =
   var redraw = 0
 
   while true:
+    
+    for id, v in app.views:
+      if v.tick():
+        redraw = 2
 
     if app.pollSdl():
       redraw = 2
