@@ -329,9 +329,9 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
   # graph state
   var
-    rects = newSeqOfCap[Rect](g.events.len)
-    graphRects = newSeqOfCap[Rect](g.events.len)
-    pointsAvg: seq[Point]
+    rects = newSeqOfCap[Rect](v.w)
+    graphRects = newSeqOfCap[Rect](v.w)
+    graphPoints = newSeqOfCap[Point](v.w)
 
   # Binary search for event indices which lie in the current view
   var i1 = g.events.lowerbound(v.cfg.ts.lo, (e, t) => cmp(if e.ts.hi != NoTime: e.ts.hi else: e.ts.lo, t))
@@ -359,7 +359,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
         rects.add Rect(x: x1, y: y, w: x2-x1+1, h: h)
       of ekCounter, ekGauge:
         graphRects.add Rect(x: x1, y: y, w: x2-x1+1, h: h)
-        pointsAvg.add Point(x: x1, y: val2y(vTot / nTot))
+        graphPoints.add Point(x: x1, y: val2y(vTot / nTot))
         if nTot > 1:
           let yMin = vMin.val2Y
           let yMax = vMax.val2Y
@@ -400,8 +400,8 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
   if rects.len > 0:
     discard v.rend.renderFillRects(rects[0].addr, rects.len)
 
-  if pointsAvg.len > 0:
-    discard v.rend.renderDrawLines(pointsAvg[0].addr, pointsAvg.len)
+  if graphPoints.len > 0:
+    discard v.rend.renderDrawLines(graphPoints[0].addr, graphPoints.len)
 
   if graphRects.len > 0:
     col.a = 96
@@ -724,6 +724,8 @@ proc toggleBin(v:View, bin: Bin) =
 
 
 proc sdlEvent*(v: View, e: sdl.Event) =
+        
+  let modShift = (getModState().int32 and (KMOD_LSHIFT.int32 or KMOD_RSHIFT.int32)) != 0
 
   case e.kind
 
@@ -782,7 +784,7 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.openAll()
         of sdl.K_1..sdl.K_9:
           let bin = key.int - sdl.K_1.int + 1
-          if (getModState().int32 and (KMOD_LSHIFT.int32 or KMOD_RSHIFT.int32)) != 0:
+          if modShift:
             v.toggleBin(bin)
           else:
             if v.curGroup != nil:
