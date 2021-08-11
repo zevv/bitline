@@ -47,6 +47,7 @@ type
     groupViews: Table[string, GroupView]
     hideBin: array[10, bool]
     follow: bool
+    utc: bool
 
   View* = ref object
     cfg: ViewConfig
@@ -69,6 +70,7 @@ type
     textCache: TextCache
     cmdLine: CmdLine
     tNow: uint32
+    tz: TimeZone
 
   CmdLine = ref object
     active: bool
@@ -153,8 +155,8 @@ proc drawGrid(v: View) =
 
   let dt = v.cfg.ts.hi - v.cfg.ts.lo
   let tpp = dt / v.w.Time
-  let tFrom = v.cfg.ts.lo.fromUnixFloat.utc
-  let tTo = v.cfg.ts.hi.fromUnixFloat.utc
+  let tFrom = v.cfg.ts.lo.fromUnixFloat.inZone(v.tz)
+  let tTo = v.cfg.ts.hi.fromUnixFloat.inZone(v.tz)
   var dy = 0
 
   template aux(interval: Time,
@@ -168,7 +170,7 @@ proc drawGrid(v: View) =
       var (hour, min, sec, nsec) = (ihour.int, imin.int, isec.int, 0)
       var nLabels = 0
       while true:
-        let t = initDateTime(mday.MonthDayRange, month.Month, year, hour, min, sec, nsec, utc())
+        let t = initDateTime(mday.MonthDayRange, month.Month, year, hour, min, sec, nsec, v.tz)
         if t > tTo:
           break
         if t > tFrom:
@@ -203,7 +205,7 @@ proc drawGrid(v: View) =
       if nLabels > 0:
         dy += v.cfg.rowSize
 
-  var t = v.cfg.ts.lo.fromUnixFloat.utc
+  var t = v.cfg.ts.lo.fromUnixFloat.inZone(v.tz)
   aux(0.001,        t.year, t.month, t.monthday, t.hour, t.minute, t.second, "fff", "s'.'fff"): inc nsec,   1 * 1000 * 1000
   aux(0.01,         t.year, t.month, t.monthday, t.hour, t.minute, t.second, "fff", "s'.'fff"): inc nsec,  10 * 1000 * 1000
   aux(0.1,          t.year, t.month, t.monthday, t.hour, t.minute, t.second, "fff", "s'.'fff"): inc nsec, 100 * 1000 * 1000
@@ -542,7 +544,10 @@ proc drawStatusbar(v: View, aps: AppStats) =
     text =
       "render: " & siFmt(vws.renderTime, "s") & ", " &
       "groups: " & siFmt(aps.groupCount) & ", " &
-      "events: " & siFmt(aps.eventCount)
+      "events: " & siFmt(aps.eventCount) & " (" &
+      (if v.cfg.utc: "utc" else: "local") &
+      (if v.cfg.follow: " , follow" else: "") &
+      ")"
 
   let h = v.cfg.rowSize + 3
   let y = v.h - h
@@ -586,6 +591,7 @@ proc resetConfig(v: View) =
   v.cfg.luma = 60
   v.cfg.groupViews.clear()
   v.cfg.hideBin.reset()
+  v.cfg.utc = false
   v.groupView(v.rootGroup).isOpen = true
 
 proc newView*(rootGroup: Group, w, h: int, cfgPath: string): View =
@@ -658,6 +664,7 @@ proc draw*(v: View, appStats: AppStats) =
 
   v.cfg.rowSize = v.cfg.rowSize.clamp(4, 128)
   v.pixelsPerSecond = v.w.float / (v.cfg.ts.hi - v.cfg.ts.lo)
+  v.tz = if v.cfg.utc: utc() else: local()
 
   let t1 = cpuTime()
 
@@ -778,6 +785,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.resetConfig()
         of sdl.K_s:
           v.saveConfig(v.cfgPath)
+        of sdl.K_t:
+          v.cfg.utc = not v.cfg.utc
         of sdl.K_a:
           v.zoomAll()
         of sdl.K_c:

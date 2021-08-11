@@ -17,6 +17,7 @@ keys:
  l             toggle log scale for graphs"
  q             quit
  s             save session view
+ t             toggle between UTC and local time zone
  [ / ]         adjust alpha
  + / -         adjust font size
  shift         measure
