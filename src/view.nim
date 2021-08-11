@@ -546,7 +546,7 @@ proc drawStatusbar(v: View, aps: AppStats) =
       "groups: " & siFmt(aps.groupCount) & ", " &
       "events: " & siFmt(aps.eventCount) & " (" &
       (if v.cfg.utc: "utc" else: "local") &
-      (if v.cfg.follow: " , follow" else: "") &
+      (if v.cfg.follow: ", follow" else: "") &
       ")"
 
   let h = v.cfg.rowSize + 3
