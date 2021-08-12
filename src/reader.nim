@@ -76,7 +76,8 @@ proc read*(reader: Reader): bool =
 proc newReader*(fname: string, cb: ReaderCallback): Reader =
   let fd = posix.open(fname.c_string, posix.O_RDONLY or posix.O_NONBLOCK)
   if fd == -1:
-    return nil
+    echo "Error opening $1: $2" % [fname, $posix.strerror(posix.errno)]
+    quit 1
 
   Reader(
     rxBuf: newString(readBufSize),

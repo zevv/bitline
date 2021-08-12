@@ -48,6 +48,7 @@ type
     hideBin: array[10, bool]
     follow: bool
     utc: bool
+    showGui: bool
 
   View* = ref object
     cfg: ViewConfig
@@ -64,7 +65,6 @@ type
     curGroup: Group
     curEvent: Event
     stats: ViewStats
-    showGui: bool
     win: sdl.Window
     rend: sdl.Renderer
     textCache: TextCache
@@ -85,24 +85,30 @@ type
     y: int
     col: Color
 
+
 # Misc helpers
 
 proc resetConfig(v: View)
+
 
 proc groupView(v: View, g: Group): GroupView =
   if g != nil:
     result = v.cfg.groupViews.mgetOrPut($g, GroupView(bin: 1))
 
+
 proc time2x(v: View, t: Time): int =
   result = int((t - v.cfg.ts.lo) * v.pixelsPerSecond)
+
 
 proc ts2x(v: View, ts: TimeSpan): (int, int) =
   let x1 = v.time2x(ts.lo)
   let x2 = if ts.hi != NoTime: v.time2x(ts.hi) else: x1
   (x1, x2)
 
+
 proc x2time(v: View, x: int): Time =
   v.cfg.ts.lo + (x / v.w) * (v.cfg.ts.hi - v.cfg.ts.lo)
+
 
 proc binColor(v: View, bin: Bin, depth=0): Color =
   let hue = bin.float / 9.0 * 360 + 180
@@ -110,28 +116,37 @@ proc binColor(v: View, bin: Bin, depth=0): Color =
   let col = chroma.ColorPolarLUV(h: hue, c: 100.0, l: luma).color()
   Color(r: (col.r * 255).uint8, g: (col.g * 255).uint8, b: (col.b * 255).uint8, a: 255.uint8)
 
+
 proc groupColor(v: View, g: Group): Color =
   let gv = v.groupView(g)
   v.binColor(gv.bin, g.depth)
+
+
+proc toggle(v: var bool) = v = not v
+
 
 # Drawing primitives
 
 proc setColor(v: View, col: sdl.Color) =
   discard v.rend.setRenderDrawColor(col)
 
+
 proc drawLine(v: View, x1, y1, x2, y2: int) =
   if (x1 > 0 or x2 > 0) and (x1 < v.w or x2 < v.w):
     discard v.rend.renderDrawLine(x1, y1, x2, y2)
+
 
 proc drawFillRect(v: View, x1, y1, x2, y2: int) =
   if (x1 > 0 or x2 > 0) and (x1 < v.w or x2 < v.w):
     var r = Rect(x: x1, y: y1, w: x2-x1+1, h: y2-y1+1)
     discard v.rend.renderFillRect(r.addr)
 
+
 proc drawRect(v: View, x1, y1, x2, y2: int) =
   if (x1 > 0 or x2 > 0) and (x1 < v.w or x2 < v.w):
     var r = Rect(x: x1, y: y1, w: x2-x1+1, h: y2-y1+1)
     discard v.rend.renderDrawRect(r.addr)
+
 
 proc drawText(v: View, x, y: int, text: string, col: sdl.Color, align=AlignLeft) =
   v.textCache.drawText(text, x, y, col, align)
@@ -218,6 +233,7 @@ proc drawGrid(v: View) =
   aux(60*60*24,     t.year, t.month, t.monthday, 0,      0,        0,        "dd", "MMM dd"): inc mday
   aux(60*60*24*30,  t.year, t.month, 1,          0,      0,        0,        "MMM", "MMM '`'yy"): inc month
   aux(60*60*24*365, t.year, mJan,    1,          0,      0,        0,        "yy", "yyyy"): inc year
+
 
 proc drawCursor(v: View) =
   let
@@ -567,24 +583,25 @@ proc drawStatusbar(v: View, aps: AppStats) =
     v.drawText(v.w - 128 + bin.int*13, v.h - h, $bin, col)
 
 
-
 proc drawGui(v: View) =
 
-  if not v.showGui:
+  if not v.cfg.showGui:
     return
 
-  v.gui.start(0, 0)
-  v.gui.start(PackVer)
+  v.gui.start(20, v.cfg.rowSize*2)
+  v.gui.start(PackHor)
 
-  #discard v.gui.slider("C", C, 0, 100, true)
-  #discard v.gui.slider("L", L, 0, 100, true)
+  v.gui.label("Time settings:")
+  discard v.gui.button("follow", v.cfg.follow)
+  discard v.gui.button("UTC", v.cfg.utc)
 
   v.gui.stop()
   v.gui.stop()
 
 
 proc loadConfig*(v: View, fname: string)
- 
+
+
 proc resetConfig(v: View) =
   v.cfg.ts = initSpan[Time](0.0, 1.0)
   v.cfg.rowSize = 12
@@ -593,6 +610,7 @@ proc resetConfig(v: View) =
   v.cfg.hideBin.reset()
   v.cfg.utc = false
   v.groupView(v.rootGroup).isOpen = true
+
 
 proc newView*(rootGroup: Group, w, h: int, cfgPath: string): View =
   let v = View(
@@ -626,6 +644,7 @@ proc closeAll*(v: View) =
   for _, gv in v.cfg.groupViews:
     gv.isOpen = false
 
+
 proc openAll*(v: View) =
   proc aux(g: Group) =
     v.groupView(g).isOpen = true
@@ -633,29 +652,35 @@ proc openAll*(v: View) =
       aux(cg)
   aux(v.rootGroup)
 
+
 proc zoomX*(v: View, f: float) =
   let tm = v.x2time(v.mouseX)
   v.cfg.ts.lo = tm - (tm - v.cfg.ts.lo) * f
   v.cfg.ts.hi = tm + (v.cfg.ts.hi - tm) * f
+
 
 proc zoomAll*(v: View) =
   v.cfg.yTop = 0
   if v.rootGroup.ts.lo != NoTime and v.rootGroup.ts.hi != NoTime:
     v.cfg.ts = v.rootGroup.ts
 
+
 proc panY*(v: View, dy: int) =
   v.cfg.yTop -= dy
+
 
 proc panX*(v: View, dx: int) =
   let dt = (v.cfg.ts.hi - v.cfg.ts.lo) / v.w.float * dx.float
   v.cfg.ts.lo = v.cfg.ts.lo + dt
   v.cfg.ts.hi = v.cfg.ts.hi + dt
 
+
 proc getWindow*(v: View): Window =
   v.win
  
 proc setTMeasure*(v: View, t: Time) =
   v.tMeasure = t
+
 
 proc draw*(v: View, appStats: AppStats) =
 
@@ -729,7 +754,7 @@ proc setBin(v:View, g: Group, bin: Bin) =
 
 
 proc toggleBin(v:View, bin: Bin) =
-  v.cfg.hideBin[bin] = not v.cfg.hideBin[bin]
+  toggle v.cfg.hideBin[bin]
 
 
 proc sdlEvent*(v: View, e: sdl.Event) =
@@ -783,16 +808,18 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.tMeasure = v.x2time(v.mouseX)
         of sdl.K_r:
           v.resetConfig()
+        of sdl.K_g:
+          toggle v.cfg.showGui
         of sdl.K_s:
           v.saveConfig(v.cfgPath)
         of sdl.K_t:
-          v.cfg.utc = not v.cfg.utc
+          toggle v.cfg.utc
         of sdl.K_a:
           v.zoomAll()
         of sdl.K_c:
           v.closeAll()
         of sdl.K_f:
-          v.cfg.follow = not v.cfg.follow
+          toggle v.cfg.follow
         of sdl.K_o:
           v.openAll()
         of sdl.K_1..sdl.K_9:
@@ -846,24 +873,22 @@ proc sdlEvent*(v: View, e: sdl.Event) =
       v.dragX = e.button.x
       v.dragY = e.button.y
 
-      if not v.gui.isActive():
+      if v.dragButton != 0:
+        inc v.dragged, abs(dx) + abs(dy)
 
-        if v.dragButton != 0:
-          inc v.dragged, abs(dx) + abs(dy)
+      if v.dragButton == sdl.BUTTON_Left:
+        v.panY dy
+        v.panX dx
 
-        if v.dragButton == sdl.BUTTON_Left:
-          v.panY dy
-          v.panX dx
-
-        if v.dragButton == sdl.BUTTON_RIGHT:
-          v.zoomX pow(1.01, dy.float)
-          v.panX dx
+      if v.dragButton == sdl.BUTTON_RIGHT:
+        v.zoomX pow(1.01, dy.float)
+        v.panX dx
 
     of sdl.MouseButtonDown:
-      let b = e.button.button
       if v.gui.mouseButton(e.button.x, e.button.y, 1):
         return
 
+      let b = e.button.button
       v.dragButton = b
       v.dragged = 0
 
@@ -871,10 +896,10 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         v.tMeasure = v.x2time(e.button.x)
 
     of sdl.MouseButtonUp:
-      let b = e.button.button
       if v.gui.mouseButton(e.button.x, e.button.y, 0):
         return
 
+      let b = e.button.button
       v.dragButton = 0
 
       if v.dragged < 3:
@@ -885,7 +910,6 @@ proc sdlEvent*(v: View, e: sdl.Event) =
               v.groupView(v.curGroup).isOpen = false
             else:
               if v.curGroup.groups.len > 0:
-                echo "opened"
                 v.groupView(v.curGroup).isOpen = true
 
         if b == sdl.BUTTON_RIGHT:

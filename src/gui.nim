@@ -33,6 +33,7 @@ type
 
   Gui* = ref object
     id_active: string
+    id_hover: string
     debug: bool
     rect_hot: Rect
     textCache: TextCache
@@ -57,8 +58,10 @@ proc newGui*(rend: Renderer, textCache: TextCache): Gui =
   g.debug = false
   return g
 
+
 proc isActive*(g: Gui): bool =
   return g.id_active != ""
+
 
 proc updatePos(g: Gui, dx, dy: int) =
   if g.box.packDir == PackHor:
@@ -71,29 +74,36 @@ proc drawRect(g: Gui, r: Rect, c: Color) =
   g.renderCmds.add(RenderCmd(kind: RenderDrawRect, rect: r, drawColor: c))
   return
 
+
 proc fillRect(g: Gui, r: Rect, c: Color) =
   g.renderCmds.add(RenderCmd(kind: RenderFillRect, rect: r, fillColor: c))
+
 
 proc drawTex(g: Gui, r: Rect, t: Texture) =
   g.renderCmds.add(RenderCmd(kind: RenderDrawTex, rect: r, tex: t))
 
 
+
 proc horizontal*(g: Gui) =
   g.box.packDir = PackHor
+
 
 proc vertical*(g: Gui) =
   g.box.packDir = PackVer
 
+
 proc mouseMove*(g: Gui, x, y: int): bool =
   g.mx = x
   g.my = y
-  g.isActive()
+  result = g.isActive()
+
 
 proc mouseButton*(g: Gui, x, y: int, b: int): bool =
   g.mx = x
   g.my = y
   g.mb = b
-  g.isActive()
+  result = g.id_hover != ""
+
 
 proc setBounds(g: Gui, rect: Rect) =
   let b = g.box
@@ -101,11 +111,13 @@ proc setBounds(g: Gui, rect: Rect) =
   br.w = max(br.w, rect.x - br.x + rect.w + b.margin)
   br.h = max(br.h, rect.y - br.y + rect.h + b.margin)
 
+
 proc drawBg(g: Gui, rect: var Rect, hot=false) =
   g.fillRect(rect, if hot: g.colItemAct else: g.colItem)
   g.drawRect(rect, g.colBorder)
   if g.debug: g.drawRect(g.rectHot, g.colHot)
   g.setBounds(rect)
+
 
 proc start*(g: Gui, x, y: int, packDir: PackDir = PackVer, margin: int = DEF_MARGIN) =
   var box = Box(x: x+margin, y: y+margin, padding: DEF_PADDING, margin: margin, packDir: packDir)
@@ -113,8 +125,10 @@ proc start*(g: Gui, x, y: int, packDir: PackDir = PackVer, margin: int = DEF_MAR
   g.boxStack.add(box)
   g.box = box
 
+
 proc start*(g: Gui, packDir: PackDir = PackVer, margin: int = DEF_MARGIN) =
   g.start(g.box.x, g.box.y, packDir, margin)
+
 
 proc stop*(g: Gui) =
   if g.debug:
@@ -163,6 +177,11 @@ proc is_inside(g: Gui, id: string, r: Rect): bool =
 proc doLogic(g: Gui, id: string, r: Rect, fn: proc(x, y: int): bool): bool =
   let inside = g.is_inside(id, r)
 
+  if inside:
+    g.id_hover = id
+  else:
+    g.id_hover = ""
+
   if g.id_active == id and g.mb == 1:
     result = fn(g.mx, g.my)
   
@@ -178,7 +197,6 @@ proc doLogic(g: Gui, id: string, r: Rect, fn: proc(x, y: int): bool): bool =
 proc doLogic(g: Gui, id: string, r: Rect): bool =
   proc fn(x, y: int): bool = return false
   return doLogic(g, id, r, fn)
-
 
 
 proc slider*(g: Gui, id: string, val: var float, vmin, vmax: float, do_log: bool=false, size_req: int=0): bool =
@@ -208,7 +226,6 @@ proc slider*(g: Gui, id: string, val: var float, vmin, vmax: float, do_log: bool
     if do_log:
       f = pow(f, 2.0)
     result = vmin + f * (vmax - vmin)
-
  
   var r_slider = Rect(x:g.box.x, y:g.box.y, w:size+p*2, h:tt.h+p*2)
   var r_label = Rect(x:g.box.x+(size - tt.w)/%2, y:g.box.y+p, w:tt.w, h:tt.h)
@@ -227,6 +244,7 @@ proc slider*(g: Gui, id: string, val: var float, vmin, vmax: float, do_log: bool
       valp[] = val2
       return true
     )
+
 
 proc slider*[T: SomeNumber](g: Gui, id: string, val: var T, vmin, vmax: T, log: bool=false): bool =
   var valf = float(val)
@@ -279,7 +297,6 @@ proc button*(g: Gui, id: string, val: var bool): bool =
 
   g.drawBg(r1, val)
   g.drawTex(r2, tt.tex)
-
   g.updatePos(r1.w, r1.h)
 
   if g.doLogic(id, r1):
@@ -300,6 +317,7 @@ proc select*(g: Gui, id: string, val: var int, items: seq[string], picker: bool 
       val = i
       result = true
   g.stop()
+
 
 template select*(g: Gui, id: string, val: typed, picker: bool = false): bool =
   var names: seq[string]
