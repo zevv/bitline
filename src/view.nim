@@ -794,34 +794,8 @@ proc sdlEvent*(v: View, e: sdl.Event) =
       else:
 
         case key
-        of sdl.K_Q:
-          quit(0)
-        of sdl.K_SEMICOLON, sdl.K_SLASH:
-          c.active = true
-        of sdl.K_EQUALS:
-          inc v.cfg.rowSize
-        of sdl.K_MINUS:
-          dec v.cfg.rowSize
         of sdl.K_0:
           v.cfg.rowSize = 12
-        of sdl.K_LSHIFT:
-          v.tMeasure = v.x2time(v.mouseX)
-        of sdl.K_r:
-          v.resetConfig()
-        of sdl.K_g:
-          toggle v.cfg.showGui
-        of sdl.K_s:
-          v.saveConfig(v.cfgPath)
-        of sdl.K_t:
-          toggle v.cfg.utc
-        of sdl.K_a:
-          v.zoomAll()
-        of sdl.K_c:
-          v.closeAll()
-        of sdl.K_f:
-          toggle v.cfg.follow
-        of sdl.K_o:
-          v.openAll()
         of sdl.K_1..sdl.K_9:
           let bin = key.int - sdl.K_1.int + 1
           if modShift:
@@ -829,6 +803,34 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           else:
             if v.curGroup != nil:
               v.setBin(v.curGroup, bin)
+        of sdl.K_a:
+          v.zoomAll()
+        of sdl.K_c:
+          v.closeAll()
+        of sdl.K_f:
+          toggle v.cfg.follow
+        of sdl.K_g:
+          toggle v.cfg.showGui
+        of sdl.K_h:
+          discard sdl.showSimpleMessageBox(0, "help", usage(), v.getWindow());
+        of sdl.K_o:
+          v.openAll()
+        of sdl.K_r:
+          v.resetConfig()
+        of sdl.K_s:
+          v.saveConfig(v.cfgPath)
+        of sdl.K_t:
+          toggle v.cfg.utc
+        of sdl.K_q:
+          quit(0)
+        of sdl.K_SEMICOLON, sdl.K_SLASH:
+          c.active = true
+        of sdl.K_EQUALS:
+          inc v.cfg.rowSize
+        of sdl.K_MINUS:
+          dec v.cfg.rowSize
+        of sdl.K_LSHIFT:
+          v.tMeasure = v.x2time(v.mouseX)
         of sdl.K_COMMA:
           v.zoomX 1.0/0.8
         of sdl.K_PERIOD:
@@ -841,8 +843,6 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.cfg.yTop += 50
         of sdl.K_DOWN:
           v.cfg.yTop -= 50
-        of sdl.K_h:
-          discard sdl.showSimpleMessageBox(0, "help", usage(), v.getWindow());
         of sdl.K_RIGHTBRACKET:
           v.cfg.luma = min(v.cfg.luma+10, 100)
         of sdl.K_LEFTBRACKET:
