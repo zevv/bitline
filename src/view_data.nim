@@ -126,7 +126,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
     discard v.rend.renderFillRects(graphRects[0].addr, graphRects.len)
 
 
-proc drawMeasure(v: View, group: Group): string =
+proc genMeasure(v: View, group: Group): string =
 
   let
     tMouse = v.x2time(v.mouse_x)
@@ -176,7 +176,8 @@ proc drawMeasure(v: View, group: Group): string =
     parts.add "min=" & siFmt(vMin)
     parts.add "max=" & siFmt(vMax)
 
-  result = parts.join(", ")
+  if parts.len > 0:
+    result = " " & parts.join(", ") & " "
 
 
 
@@ -215,10 +216,10 @@ proc drawGroup(v: View, y: int, g: Group, labels: var seq[Label]): int =
   # Draw measurements for this group
   if v.tMeasure != NoTime:
     var col = v.groupColor(g)
-    let label = v.drawMeasure(g)
+    let label = v.genMeasure(g)
     let x1 = v.time2x(v.tMeasure)
     let x2 = v.mouse_x
-    labels.add Label(x: x2+2, y: y, text: label & " ", col: colEvent)
+    labels.add Label(x: x2+2, y: y, text: label, col: col)
 
   y += h
 
