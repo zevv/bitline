@@ -269,7 +269,7 @@ proc drawCursor(v: View) =
   v.drawText(x + 2, 0, label, colCursor, AlignCenter)
 
 
-proc measure(v: View, group: Group): (string, int) =
+proc drawMeasure(v: View, group: Group): string =
 
   let
     tMouse = v.x2time(v.mouse_x)
@@ -319,7 +319,7 @@ proc measure(v: View, group: Group): (string, int) =
     parts.add "min=" & siFmt(vMin)
     parts.add "max=" & siFmt(vMax)
 
-  result = (parts.join(", "), dutyCycle.int)
+  result = parts.join(", ")
 
 
 
@@ -463,15 +463,10 @@ proc drawGroup(v: View, y: int, g: Group, labels: var seq[Label]): int =
   # Draw measurements for this group
   if v.tMeasure != NoTime:
     var col = v.groupColor(g)
-    let (label, duty) = v.measure(g)
+    let label = v.drawMeasure(g)
     let x1 = v.time2x(v.tMeasure)
     let x2 = v.mouse_x
     labels.add Label(x: x2+2, y: y, text: label & " ", col: colEvent)
-    v.setColor(col)
-    v.drawFillRect(x1, y, x1-duty, y+h)
-    col = sdl.Color(r: 0, g: 0, b: 0, a:255)
-    v.setColor(col)
-    v.drawFillRect(x1-duty, y, x1-100, y+h)
 
   y += h
 

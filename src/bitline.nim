@@ -179,7 +179,7 @@ proc run*(app: App): bool =
           worked = true
       if not worked:
         break
-      if cpuTime() - t1 > 0.01:
+      if cpuTime() - t1 > 0.05:
         break
 
     if needUpdate:
