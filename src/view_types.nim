@@ -24,7 +24,7 @@ const
   colGrid*         = sdl.Color(r:128, g:128, b:128, a: 96)
   colTicks*        = sdl.Color(r:196, g:196, b:196, a:196)
   colCursor*       = sdl.Color(r:255, g:128, b:128, a:255)
-  colMeasure*      = sdl.Color(r:255, g:255, b:  0, a: 32)
+  colMeasure*      = sdl.Color(r:  0, g:255, b:255, a: 32)
   colGroupSel*     = sdl.Color(r:255, g:255, b:255, a:  8)
   colStatusbar*    = sdl.Color(r:255, g:255, b:255, a:128)
   colEvent*        = sdl.Color(r:  0, g:255, b:173, a:150)
