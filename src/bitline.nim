@@ -9,6 +9,9 @@ import parseopt
 from sdl2/sdl import nil
 
 import misc
+import view_types
+import view_control
+import view_api
 import view
 import reader
 import usage
