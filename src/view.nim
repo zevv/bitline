@@ -165,9 +165,6 @@ proc drawGrid(v: View) =
   v.drawLine(0, y1, v.w, y1)
   v.drawLine(0, y4, v.w, y4)
 
-  if v.tMeasure != NoTime:
-    return
-
   let dt = v.cfg.ts.hi - v.cfg.ts.lo
   let tpp = dt / v.w.Time
   let tFrom = v.cfg.ts.lo.fromUnixFloat.inZone(v.tz)
@@ -312,7 +309,8 @@ proc measure(v: View, group: Group): (string, int) =
 
   let dutyCycle = 100.0 * time / (ts2-ts1)
 
-  parts.add "n=" & siFmt(count)
+  if count > 0:
+    parts.add "n=" & siFmt(count)
   if time > 0:
     parts.add "t=" & siFmt(time,  "s")
     parts.add "dc=" & &"{dutyCycle:.1f}%"
