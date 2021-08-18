@@ -111,15 +111,7 @@ proc pollSdl(app: App): bool =
     of sdl.Quit:
       quit 0
 
-    of sdl.TextInput:
-      let v = app.views[e.key.windowId]
-      v.sdlEvent(e)
-
-    of sdl.KeyDown:
-      let v = app.views[e.key.windowId]
-      v.sdlEvent(e)
-
-    of sdl.KeyUp:
+    of sdl.TextInput, sdl.KeyDown, sdl.KeyUp:
       let v = app.views[e.key.windowId]
       v.sdlEvent(e)
 
@@ -127,11 +119,7 @@ proc pollSdl(app: App): bool =
       let v = app.views[e.motion.windowId]
       v.sdlEvent(e)
 
-    of sdl.MouseButtonDown:
-      let v = app.views[e.button.windowId]
-      v.sdlEvent(e)
-
-    of sdl.MouseButtonUp:
+    of sdl.MouseButtonDown, sdl.MouseButtonUp:
       for id, v in app.views:
         if e.button.windowId == 0 or e.button.windowID == id:
           v.sdlEvent(e)
