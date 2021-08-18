@@ -24,18 +24,6 @@ import view_grid
 import view_data
 import view_control
 
-export sdlEvent
-
-
-
-# Misc helpers
-
-
-
-
-
-# Draw UI components
-
 
 proc drawCursor(v: View) =
   let
