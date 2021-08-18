@@ -113,29 +113,29 @@ proc pollSdl(app: App): bool =
       quit 0
 
     of sdl.TextInput, sdl.KeyDown, sdl.KeyUp:
-      let v = app.windows[e.key.windowId]
-      v.sdlEvent(e)
+      let w = app.windows[e.key.windowId]
+      w.sdlEvent(e)
 
     of sdl.MouseMotion:
-      let v = app.windows[e.motion.windowId]
-      v.sdlEvent(e)
+      let w = app.windows[e.motion.windowId]
+      w.sdlEvent(e)
 
     of sdl.MouseButtonDown, sdl.MouseButtonUp:
-      for id, v in app.windows:
+      for id, w in app.windows:
         if e.button.windowId == 0 or e.button.windowID == id:
-          v.sdlEvent(e)
+          w.sdlEvent(e)
 
     of sdl.MouseWheel:
-      let v = app.windows[e.wheel.windowId]
-      v.sdlEvent(e)
+      let w = app.windows[e.wheel.windowId]
+      w.sdlEvent(e)
 
     of sdl.WindowEvent:
-      let v = app.windows[e.window.windowId]
-      v.sdlEvent(e)
+      let w = app.windows[e.window.windowId]
+      w.sdlEvent(e)
 
     of sdl.MultiGesture:
-      for id, v in app.windows:
-        v.sdlEvent(e)
+      for id, w in app.windows:
+        w.sdlEvent(e)
 
     else:
       #echo e.kind
@@ -148,16 +148,16 @@ proc run*(app: App): bool =
 
   while true:
     
-    for id, v in app.windows:
-      if v.tick():
+    for id, w in app.windows:
+      if w.tick():
         redraw = 2
 
     if app.pollSdl():
       redraw = 2
 
     if redraw > 0:
-      for _, v in app.windows:
-        v.draw()
+      for _, w in app.windows:
+        w.draw()
       dec redraw
 
     let t1 = cpuTime()

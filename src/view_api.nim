@@ -12,7 +12,7 @@ import json
 import math
 
 import chroma except Color
-import sdl2/sdl except Event
+from sdl2/sdl import nil
 
 import textcache
 import usage
@@ -107,7 +107,7 @@ proc panX*(v: View, dx: int) =
   v.cfg.ts.hi = v.cfg.ts.hi + dt
 
 
-proc getWindow*(v: View): Window =
+proc getWindow*(v: View): sdl.Window =
   v.win
 
 
