@@ -19,6 +19,7 @@ import usage
 import gui
 import misc
 import view_types
+import window
 
 
 # Draw UI components

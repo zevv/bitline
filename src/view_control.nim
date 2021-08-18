@@ -18,6 +18,7 @@ import textcache
 import usage
 import gui
 import misc
+import window
 import view_types
 import view_grid
 import view_data
@@ -25,7 +26,7 @@ import view_api
 
 
 
-proc sdlEvent*(v: View, e: sdl.Event) =
+method sdlEvent*(v: View, e: sdl.Event) =
         
   let modShift = (getModState().int32 and (KMOD_LSHIFT.int32 or KMOD_RSHIFT.int32)) != 0
 
@@ -195,17 +196,12 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         let gv = v.groupView(v.curGroup)
         gv.height = (gv.height + e.wheel.y).clamp(0, 10)
 
-    of sdl.WindowEvent:
-      if e.window.event == sdl.WINDOWEVENT_RESIZED:
-        v.w = e.window.data1
-        v.h = e.window.data2
-
     of sdl.MultiGesture:
       let z = pow(1.02, -v.w.float * e.mgesture.dDist)
       v.zoomx z
 
     else:
-      discard
+      procCall sdlEvent(Win(v), e)
 
 
 # vi: ft=nim sw=2 ts=2

@@ -18,6 +18,7 @@ import textcache
 import usage
 import gui
 import misc
+import window
 
 const
   colBg*           = sdl.Color(r:  0, g:  0, b: 16, a:255)
@@ -49,14 +50,13 @@ type
     follow*: bool
     utc*: bool
     showGui*: bool
-
-  View* = ref object
+  
+  View* = ref object of Win
     cfg*: ViewConfig
     cfgPath*: string
     rootGroup*: Group
     pixelsPerSecond*: float
     tMeasure*: Time
-    w*, h*: int
     mouseX*, mouseY*: int
     dragX*, dragY*: int
     dragButton*: int
@@ -65,9 +65,6 @@ type
     curGroup*: Group
     curEvent*: Event
     stats*: ViewStats
-    win*: sdl.Window
-    rend*: sdl.Renderer
-    textCache*: TextCache
     cmdLine*: CmdLine
     tNow*: uint32
     tz*: TimeZone
@@ -84,32 +81,6 @@ type
     x*: int
     y*: int
     col*: Color
-
-# Drawing primitives
-
-proc setColor*(v: View, col: sdl.Color) =
-  discard v.rend.setRenderDrawColor(col)
-
-
-proc drawLine*(v: View, x1, y1, x2, y2: int) =
-  if (x1 > 0 or x2 > 0) and (x1 < v.w or x2 < v.w):
-    discard v.rend.renderDrawLine(x1, y1, x2, y2)
-
-
-proc drawFillRect*(v: View, x1, y1, x2, y2: int) =
-  if (x1 > 0 or x2 > 0) and (x1 < v.w or x2 < v.w):
-    var r = Rect(x: x1, y: y1, w: x2-x1+1, h: y2-y1+1)
-    discard v.rend.renderFillRect(r.addr)
-
-
-proc drawRect*(v: View, x1, y1, x2, y2: int) =
-  if (x1 > 0 or x2 > 0) and (x1 < v.w or x2 < v.w):
-    var r = Rect(x: x1, y: y1, w: x2-x1+1, h: y2-y1+1)
-    discard v.rend.renderDrawRect(r.addr)
-
-
-proc drawText*(v: View, x, y: int, text: string, col: sdl.Color, align=AlignLeft) =
-  v.textCache.drawText(text, x, y, col, align)
 
 
 proc groupView*(v: View, g: Group): GroupView =

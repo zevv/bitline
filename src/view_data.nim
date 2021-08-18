@@ -18,6 +18,7 @@ import textcache
 import usage
 import gui
 import misc
+import window
 import view_types
 import view_grid
 

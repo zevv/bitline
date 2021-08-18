@@ -18,6 +18,7 @@ import textcache
 import usage
 import gui
 import misc
+import window
 import view_types
 import view_api
 import view_grid
@@ -152,7 +153,9 @@ proc newView*(rootGroup: Group, w, h: int, cfgPath: string): View =
 
 
 
-proc draw*(v: View, appStats: AppStats) =
+method draw*(v: View) =
+
+  var appStats: AppStats
 
   if v.cfg.ts.lo == 0.0 and v.cfg.ts.hi == 1.0 and v.rootGroup.ts.hi != NoTime:
     v.cfg.ts = v.rootGroup.ts
@@ -224,7 +227,7 @@ proc setBin(v:View, g: Group, bin: Bin) =
 
 
 
-proc tick*(v: View): bool =
+method tick*(v: View): bool =
   let tNow = sdl.getTicks()
   if v.cfg.follow:
     result = true

@@ -9,6 +9,7 @@ import parseopt
 from sdl2/sdl import nil
 
 import misc
+import window
 import view_types
 import view_control
 import view_api
@@ -20,7 +21,7 @@ type
 
   App = ref object
     root: Group
-    views: Table[uint32, View]
+    windows: Table[uint32, Win]
     gidCache: Table[string, Group]
     stats: AppStats
     readers: seq[Reader]
@@ -112,28 +113,28 @@ proc pollSdl(app: App): bool =
       quit 0
 
     of sdl.TextInput, sdl.KeyDown, sdl.KeyUp:
-      let v = app.views[e.key.windowId]
+      let v = app.windows[e.key.windowId]
       v.sdlEvent(e)
 
     of sdl.MouseMotion:
-      let v = app.views[e.motion.windowId]
+      let v = app.windows[e.motion.windowId]
       v.sdlEvent(e)
 
     of sdl.MouseButtonDown, sdl.MouseButtonUp:
-      for id, v in app.views:
+      for id, v in app.windows:
         if e.button.windowId == 0 or e.button.windowID == id:
           v.sdlEvent(e)
 
     of sdl.MouseWheel:
-      let v = app.views[e.wheel.windowId]
+      let v = app.windows[e.wheel.windowId]
       v.sdlEvent(e)
 
     of sdl.WindowEvent:
-      let v = app.views[e.window.windowId]
+      let v = app.windows[e.window.windowId]
       v.sdlEvent(e)
 
     of sdl.MultiGesture:
-      for id, v in app.views:
+      for id, v in app.windows:
         v.sdlEvent(e)
 
     else:
@@ -147,7 +148,7 @@ proc run*(app: App): bool =
 
   while true:
     
-    for id, v in app.views:
+    for id, v in app.windows:
       if v.tick():
         redraw = 2
 
@@ -155,8 +156,8 @@ proc run*(app: App): bool =
       redraw = 2
 
     if redraw > 0:
-      for _, v in app.views:
-        v.draw(app.stats)
+      for _, v in app.windows:
+        v.draw()
       dec redraw
 
     let t1 = cpuTime()
@@ -188,7 +189,7 @@ proc newApp*(w, h: int, path_session: string): App =
   )
 
   let v = newView(app.root, w, h, path_session)
-  app.views[sdl.getWindowId(v.getWindow())] = v
+  app.windows[sdl.getWindowId(v.getWindow())] = v
 
   let cursor = sdl.createSystemCursor(sdl.SYSTEM_CURSOR_ARROW)
   sdl.setCursor(cursor)
