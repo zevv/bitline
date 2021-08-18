@@ -19,6 +19,7 @@ import usage
 import gui
 import misc
 import window
+import histogram
 
 const
   colBg*           = sdl.Color(r:  0, g:  0, b: 16, a:255)
@@ -68,6 +69,7 @@ type
     cmdLine*: CmdLine
     tNow*: uint32
     tz*: TimeZone
+    hist*: Histogram
 
   CmdLine* = ref object
     active*: bool
