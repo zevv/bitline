@@ -91,7 +91,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
       let x1 = v.time2x(e.time)
       let x2 = if e.kind == ekSpan: v.time2x(e.time + e.duration) else: x1
       let value = e.value
-      if x1 > x2Cur+1 or x2 > x2Cur+1:
+      if x2 > x2Cur+1:
         (x1Next, x2Next, valueNext) = (x1, x2, value)
         break
       vTot += value
