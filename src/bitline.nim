@@ -57,12 +57,12 @@ proc addEvent(app: App, t: Time, key, ev, evdata: string) =
 
   case ev[0]
     of '+':
-      g.events.add misc.Event(kind: ekSpan, data: evdata, ts: initSpan(t, NoTime), value: value)
+      g.events.add misc.Event(kind: ekSpan, data: evdata, time: t)
     of '-':
       if g.events.len > 0:
-        g.events[^1].ts.hi = t
+        g.events[^1].duration = t - g.events[^1].time
     of '!':
-      g.events.add misc.Event(kind: ekOneshot, data: evdata, ts: initSpan(t, t), value: value)
+      g.events.add misc.Event(kind: ekOneshot, data: evdata, time: t)
     of 'c':
       if g.prevTotal == NoValue:
         g.prevTotal = value
@@ -71,13 +71,13 @@ proc addEvent(app: App, t: Time, key, ev, evdata: string) =
         let dt = t - g.prevTime
         if dt > 0.0:
           value /= dt
-          g.events.add misc.Event(kind: ekCounter, data: evdata, ts: initSpan(t, t), value: value)
+          g.events.add misc.Event(kind: ekCounter, data: evdata, time: t, value: value)
           g.vs.incl value
         g.prevTotal = total
       g.prevTime = t
 
     of 'g', 'v':
-      g.events.add misc.Event(kind: ekGauge, data: evdata, ts: initSpan(t, t), value: value)
+      g.events.add misc.Event(kind: ekGauge, data: evdata, time: t, value: value)
       g.vs.incl value
     else:
       discard

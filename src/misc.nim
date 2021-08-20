@@ -40,15 +40,22 @@ type
     ekCounter,
     ekGauge,
 
-  Event* = object
-    ts*: TimeSpan
+  Event* {.packed.} = object
+    case kind*: EventKind
+      of ekSpan:
+        duration*: Time
+      of ekCounter, ekGauge:
+        value*: Value
+      of ekOneshot:
+        discard
+    time*: Time
     data*: string
-    value*: Value
-    kind*: EventKind
 
   AppStats* = object
     eventCount*: int
     groupCount*: int
+
+echo sizeof(Event)
 
 const
   iso8601format* = "yyyy-MM-dd'T'HH:mm:ss'.'ffffff'Z'"

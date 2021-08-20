@@ -51,8 +51,8 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
     graphPoints = newSeqOfCap[Point](v.w)
 
   # Binary search for event indices which lie in the current view
-  var i1 = g.events.lowerbound(v.cfg.ts.lo, (e, t) => cmp(if e.ts.hi != NoTime: e.ts.hi else: e.ts.lo, t))
-  var i2 = g.events.upperbound(v.cfg.ts.hi, (e, t) => cmp(e.ts.lo, t))
+  var i1 = g.events.lowerbound(v.cfg.ts.lo, (e, t) => cmp(if e.kind == ekSpan: e.time+e.duration else: e.time, t))
+  var i2 = g.events.upperbound(v.cfg.ts.hi, (e, t) => cmp(e.time, t))
 
   if i1 > 0: dec i1
   if i2 < g.events.len: inc i2
@@ -88,7 +88,8 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
     while i < i2:
       let e = g.events[i]
       inc i
-      let (x1, x2) = v.ts2x(e.ts)
+      let x1 = v.time2x(e.time)
+      let x2 = if e.kind == ekSpan: v.time2x(e.time + e.duration) else: x1
       let value = e.value
       if x1 > x2Cur+1 or x2 > x2Cur+1:
         (x1Next, x2Next, valueNext) = (x1, x2, value)
@@ -145,14 +146,17 @@ proc genMeasure(v: View, group: Group): string =
     let gv = v.groupView(g)
     for id, ev in g.events:
 
-      if ts1 < ev.ts.lo and ts2 >= ev.ts.hi:
+      let ev_t1 = ev.time
+      let ev_t2 = if ev.kind == ekSpan: ev.time + ev.duration else: ev.time
+
+      if ts1 < ev_t1 and ts2 >= ev_t2:
         inc count
         if ev.value != NoValue:
           vMin = min(vMin, ev.value)
           vMax = max(vMax, ev.value)
 
-      let tsint1 = max(ts1, ev.ts.lo)
-      let tsint2 = min(ts2, ev.ts.hi)
+      let tsint1 = max(ts1, ev_t1)
+      let tsint2 = min(ts2, ev_t2)
       if tsint2 > tsint1:
         time += tsint2 - tsint1
 
@@ -228,8 +232,8 @@ proc drawGroup(v: View, y: int, g: Group, labels: var seq[Label]): int =
     var n = 0
     proc aux(g: Group) =
       if g.events.len > 0:
-        let ts1 = g.events[0].ts.lo
-        let ts2 = g.events[^1].ts.hi
+        let ts1 = g.events[0].time
+        let ts2 = g.events[^1].time
         if ts1 < v.cfg.ts.hi and (ts2 == NoTime or ts2 > v.cfg.ts.lo):
           v.drawEvents(g, y, 1)
           inc y, 2
@@ -259,7 +263,7 @@ proc drawGroup(v: View, y: int, g: Group, labels: var seq[Label]): int =
 proc drawData*(v: View) =
 
   v.curGroup = nil
-  v.curEvent.ts.lo = NoTime
+  v.curEvent.time = NoTime
 
   # Recursively draw all groups
 
@@ -270,7 +274,7 @@ proc drawData*(v: View) =
   # Draw evdata for current event
 
   let e = v.curEvent
-  if e.ts.lo != NoTime and v.tMeasure == NoTime:
+  if e.time != NoTime and v.tMeasure == NoTime:
     var text = e.data
     if e.value != NoValue:
       text = text & " (" & e.value.siFmt & ")"
