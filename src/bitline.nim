@@ -21,66 +21,9 @@ type
   App = ref object
     root: Group
     views: Table[uint32, View]
-    gidCache: Table[string, Group]
     stats: AppStats
     readers: seq[Reader]
 
-
-proc keyToGroup(app: App, key: string): Group =
-  var g: Group
-  if key in app.gidCache:
-    g = app.gidCache[key]
-  else:
-    g = app.root
-    for id in key.split("."):
-      if id notin g.groups:
-        g.groups[id] = g.newGroup(id)
-        g = g.groups[id]
-      else:
-        g = g.groups[id]
-      app.gidCache[key] = g
-  return g
-
-
-proc addEvent(app: App, t: Time, key, ev, evdata: string) =
-
-  let g = app.keytoGroup(key)
-  g.ts.incl t
-
-  var value = NoValue
-  try:
-    let vs = evdata.splitWhitespace()
-    if vs.len > 0:
-      value = vs[0].parseFloat()
-  except:
-    discard
-
-  case ev[0]
-    of '+':
-      g.events.add misc.Event(kind: ekSpan, data: evdata, time: t)
-    of '-':
-      if g.events.len > 0:
-        g.events[^1].duration = t - g.events[^1].time
-    of '!':
-      g.events.add misc.Event(kind: ekOneshot, data: evdata, time: t)
-    of 'c':
-      if g.prevTotal == NoValue:
-        g.prevTotal = value
-      else:
-        let total = g.prevTotal + value
-        let dt = t - g.prevTime
-        if dt > 0.0:
-          value /= dt
-          g.events.add misc.Event(kind: ekCounter, data: evdata, time: t, value: value)
-          g.vs.incl value
-        g.prevTotal = total
-      g.prevTime = t
-
-    of 'g', 'v':
-      g.events.add misc.Event(kind: ekGauge, data: evdata, time: t, value: value)
-      g.vs.incl value
-    else:
-      discard
 
 # Propagate group timespan to parents and count events
 
@@ -96,6 +39,8 @@ proc updateGroups(app: App, updateViews=false) =
       g.ts.incl aux(gc)
     result = g.ts
   let ts = aux(app.root)
+
+  echo app.stats.eventCount
 
 
 proc pollSdl(app: App): bool =
@@ -170,7 +115,7 @@ proc run*(app: App): bool =
           worked = true
       if not worked:
         break
-      if cpuTime() - t1 > 0.05:
+      if cpuTime() - t1 > 1.00:
         break
 
     if needUpdate:
@@ -205,10 +150,7 @@ proc addReader(app: App, fname: string) =
   if fname == "-":
     fname = "/dev/stdin"
 
-  let onEvent = proc(t: Time, key, ev, evdata: string) =
-    app.addEvent(t, key, ev, evdata)
-
-  let reader = newReader(fname, onEvent)
+  let reader = newReader(fname, app.root)
   if reader != nil:
     app.readers.add reader
 
