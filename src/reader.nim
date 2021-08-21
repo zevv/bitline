@@ -1,6 +1,7 @@
 
 import strutils
 import tables
+import parseutils
 import times except Time
 from posix import nil
 
@@ -22,7 +23,6 @@ type
 
 const
   readBufSize = 256 * 1024
-
     
 
 proc keyToGroup(reader: Reader, root: Group, key: string): Group =
@@ -41,8 +41,7 @@ proc keyToGroup(reader: Reader, root: Group, key: string): Group =
   return g
 
 
-
-proc addEvent(reader: Reader, t: Time, key, ev, evdata: string) =
+proc addEvent(reader: Reader, t: Time, key: string, ev: char, evdata: string) =
 
   let g = reader.keyToGroup(reader.root, key)
   g.ts.incl t
@@ -55,7 +54,7 @@ proc addEvent(reader: Reader, t: Time, key, ev, evdata: string) =
   except:
     discard
 
-  case ev[0]
+  case ev:
     of '+':
       g.events.add misc.Event(kind: ekSpan, data: evdata, time: t)
     of '-':
@@ -75,7 +74,6 @@ proc addEvent(reader: Reader, t: Time, key, ev, evdata: string) =
           g.vs.incl value
         g.prevTotal = total
       g.prevTime = t
-
     of 'g', 'v':
       g.events.add misc.Event(kind: ekGauge, data: evdata, time: t, value: value)
       g.vs.incl value
@@ -83,55 +81,68 @@ proc addEvent(reader: Reader, t: Time, key, ev, evdata: string) =
       discard
 
 
-proc parseEvent(reader: Reader, l: string) =
+proc parseEvent(reader: Reader, l: string, off: int): int =
 
-  let r = l.splitWhiteSpace(3)
+  var t: float
+  var key: string
+  var ev: char
+  var evdata: string
+  var r, n: int
 
-  if r.len == 2 and r[0] == "prefix":
-    reader.prefix = r[1] & "."
+  # TODO t = tmp.parse(iso8601format).toTime.toUnixFloat
 
-  if r.len >= 3:
-    let (ts, ev, key) = (r[0], r[1], r[2])
-    let evdata = if r.len == 4: r[3] else: ""
-    var t = NoTime
+  r = l.parseFloat(t, off+n)
+  if r == 0: return 0
+  n += r
+  r = l.skipWhile({' '}, off+n)
+  if r == 0: return 0
+  n += r
+  r = l.parseChar(ev, off+n)
+  if r == 0: return 0
+  n += r
+  r = l.skipWhile({' '}, off+n)
+  if r == 0: return 0
+  n += r
+  r = l.parseUntil(key, {' ','\r','\n'}, off+n)
+  if r == 0: return 0
+  n += r
+  r = l.skipWhile({' '}, off+n)
+  n += r
+  r = l.parseUntil(evdata, {'\r','\n'}, off+n)
+  n += r
+  r = l.skipWhile({'\r','\n'}, off+n)
+  if r == 0: return 0
+  n += r
 
-    try:
-      t = ts.parseFloat()
-    except:
-      try:
-        t = ts.parse(iso8601format).toTime.toUnixFloat
-      except:
-        return
-
-    reader.addEvent(t, reader.prefix & key, ev, evdata)
+  #echo t, " ", ev, " ", key, " ", evdata
+  reader.addEvent(t, reader.prefix & key, ev, evdata)
+  return n
 
 
 proc read*(reader: Reader): bool =
   var count = 0
 
-  let n = posix.read(reader.fd, reader.rxBuf[reader.rxPtr].addr, readBufSize - reader.rxPtr)
+  var n = posix.read(reader.fd, reader.rxBuf[reader.rxPtr].addr, readBufSize - reader.rxPtr - 1)
   if n <= 0:
     return false
+  reader.rxBuf[reader.rxPtr+n] = '\0'
+  n += reader.rxPtr
 
-  reader.rxPtr += n
-  var o1 = 0
-  var o2 = 0
+  var off = 0
 
   while true:
-    o2 = reader.rxBuf.find("\n", o1, reader.rxPtr-1)
-    if o2 > -1:
-      let l = reader.rxBuf[o1..<o2]
-      reader.parseEvent(l)
-      inc count
-      o1 = o2 + 1
+    let r = reader.parseEvent(reader.rxBuf, off)
+    if r > 0:
+      off += r
     else:
-      let nLeft = reader.rxPtr - o1
-      if nLeft > 0:
-        moveMem(reader.rxBuf[0].addr, reader.rxBuf[o1].addr, nLeft)
-      reader.rxPtr = nLeft
       break
 
-  return count > 0
+  let nLeft = n - off
+  if nLeft > 0:
+     moveMem(reader.rxBuf[0].addr, reader.rxBuf[off].addr, nLeft)
+  reader.rxPtr = nLeft
+
+  return true
 
 
 
