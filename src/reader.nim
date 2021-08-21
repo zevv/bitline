@@ -87,34 +87,27 @@ proc parseEvent(reader: Reader, l: string, off: int): int =
   var key: string
   var ev: char
   var evdata: string
-  var r, n: int
+  var n: int
 
   # TODO t = tmp.parse(iso8601format).toTime.toUnixFloat
 
-  r = l.parseFloat(t, off+n)
-  if r == 0: return 0
-  n += r
-  r = l.skipWhile({' '}, off+n)
-  if r == 0: return 0
-  n += r
-  r = l.parseChar(ev, off+n)
-  if r == 0: return 0
-  n += r
-  r = l.skipWhile({' '}, off+n)
-  if r == 0: return 0
-  n += r
-  r = l.parseUntil(key, {' ','\r','\n'}, off+n)
-  if r == 0: return 0
-  n += r
-  r = l.skipWhile({' '}, off+n)
-  n += r
-  r = l.parseUntil(evdata, {'\r','\n'}, off+n)
-  n += r
-  r = l.skipWhile({'\r','\n'}, off+n)
-  if r == 0: return 0
-  n += r
+  template req(code: untyped) =
+    let r = code
+    if r == 0: return 0
+    n += r
+  
+  template opt(code: untyped) =
+    n += code
 
-  #echo t, " ", ev, " ", key, " ", evdata
+  req l.parseFloat(t, off+n)
+  req l.skipWhile({' '}, off+n)
+  req l.parseChar(ev, off+n)
+  req l.skipWhile({' '}, off+n)
+  req l.parseUntil(key, {' ','\r','\n'}, off+n)
+  opt l.skipWhile({' '}, off+n)
+  opt l.parseUntil(evdata, {'\r','\n'}, off+n)
+  req l.skipWhile({'\r','\n'}, off+n)
+
   reader.addEvent(t, reader.prefix & key, ev, evdata)
   return n
 
