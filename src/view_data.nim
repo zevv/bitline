@@ -90,7 +90,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
       inc i
       let x1 = v.time2x(e.time)
       let x2 = if e.kind == ekSpan: v.time2x(e.time + e.duration) else: x1
-      let value = e.value
+      let value = if e.kind in {ekCounter,ekGauge}: e.value else: 0
       if x2 > x2Cur+1:
         (x1Next, x2Next, valueNext) = (x1, x2, value)
         break
@@ -151,7 +151,7 @@ proc genMeasure(v: View, group: Group): string =
 
       if ts1 < ev_t1 and ts2 >= ev_t2:
         inc count
-        if ev.value != NoValue:
+        if ev.kind in {ekCounter,ekGauge}:
           vMin = min(vMin, ev.value)
           vMax = max(vMax, ev.value)
 
