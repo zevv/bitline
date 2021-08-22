@@ -18,12 +18,12 @@ keys:
  q             quit
  s             save session view
  t             toggle between UTC and local time zone
- [ / ]         adjust alpha
- + / -         adjust font size
+ [ / ]         adjust row size
+ + / - / 0     adjust font size
  shift         measure
  /             search
- 0..9          set group
- shift + 0..9  toggle group
+ 1..9          set group
+ shift + 1..9  toggle group
 
 mouse:
  LMB           drag: pan    click: open

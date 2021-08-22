@@ -112,9 +112,13 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         of sdl.K_DOWN:
           v.cfg.yTop -= 50
         of sdl.K_RIGHTBRACKET:
-          v.cfg.luma = min(v.cfg.luma+10, 100)
+          if v.curGroup != nil:
+            let gv = v.groupView(v.curGroup)
+            gv.height = (gv.height + 1).clamp(0, 10)
         of sdl.K_LEFTBRACKET:
-          v.cfg.luma = max(v.cfg.luma-10, 20)
+          if v.curGroup != nil:
+            let gv = v.groupView(v.curGroup)
+            gv.height = (gv.height - 1).clamp(0, 10)
         of sdl.K_l:
           if v.curGroup != nil:
             let gv = v.groupView(v.curGroup)
