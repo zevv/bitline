@@ -185,7 +185,7 @@ proc draw*(v: View, appStats: AppStats) =
   v.drawStatusbar(appStats)
 
   if v.curGroup != nil:
-    v.drawHistogram(v.curGroup)
+    v.drawHistogram(v.curGroup, v.cfg.rowSize)
 
   v.rend.renderPresent
 

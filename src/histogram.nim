@@ -14,13 +14,10 @@ proc getVal(e: Event): Value =
       0
 
 
-proc drawHistogram*(v: View, g: Group) =
+proc drawHistogram*(v: View, g: Group, y = 16) =
   
   var w = 256
   var h = 128
-
-  v.setColor sdl.Color(a: 128)
-  v.drawFillRect(v.w-w, 0, v.w-1, h)
 
   var vTot, nTot: Value
   for e in g.events:
@@ -47,12 +44,16 @@ proc drawHistogram*(v: View, g: Group) =
       accum[bin] += 1.0
       accumMax = max(accum[bin], accumMax)
   
+  v.setColor sdl.Color(a: 128)
+  v.drawFillRect(v.w-w, y, v.w-1, h+y)
+  
   v.setColor v.groupColor(g)
+  v.drawRect(v.w-w, y, v.w-1, h+y)
 
   for i in 0..<bins:
     let x1 = (w * (i+0) / bins).int
     let x2 = (w * (i+1) / bins).int - 2
     let y1 = h - (h.float * accum[i] / accumMax).int
     let y2 = h.int
-    v.drawFillRect(v.w-w+x1, y1, v.w-w+x2, y2)
+    v.drawFillRect(v.w-w+x1, y1+y, v.w-w+x2, y2+y)
 
