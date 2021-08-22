@@ -134,7 +134,7 @@ proc x2time*(v: View, x: int): Time =
 proc binColor*(v: View, bin: Bin, depth=0): Color =
   let hue = bin.float / 9.0 * 360 + 180
   let luma = float(v.cfg.luma) # + (100 - v.cfg.luma) / (depth+1)
-  let col = chroma.ColorPolarLUV(h: hue, c: 100.0, l: luma).color()
+  let col = chroma.ColorPolarLUV(h: hue, c: 150.0, l: luma).color()
   Color(r: (col.r * 255).uint8, g: (col.g * 255).uint8, b: (col.b * 255).uint8, a: 255.uint8)
 
 
