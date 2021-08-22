@@ -86,11 +86,11 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
     # Collect all events on the current x position
     while i < i2:
-      let e = g.events[i]
-      inc i
-      let x1 = v.time2x(e.time)
-      let x2 = if e.kind == ekSpan: v.time2x(e.time + e.duration) else: x1
-      let value = if e.kind in {ekCounter,ekGauge}: e.value else: 0
+      let
+        e = g.events[i]
+        x1 = v.time2x(e.time)
+        x2 = if e.kind == ekSpan: v.time2x(e.time + e.duration) else: x1
+        value = if e.kind in {ekCounter,ekGauge}: e.value else: 0
       if x2 > x2Cur+1:
         (x1Next, x2Next, valueNext) = (x1, x2, value)
         break
@@ -98,6 +98,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
       vMin = min(vMin, value)
       vMax = max(vMax, value)
       nTot += 1
+      inc i
 
     if x1Cur != int.low:
       emit()
