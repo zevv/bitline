@@ -14,11 +14,10 @@ proc getVal(e: Event): Value =
       0
 
 
-proc drawHistogram*(v: View, g: Group, y = 16) =
-  
-  var w = 256
-  var h = 128
+proc drawHistogram*(v: View, g: Group, w, h: int) =
 
+  echo w, " ", h
+  
   var vTot, nTot: Value
   for e in g.events:
     if v.cfg.ts.contains(e.time):
@@ -32,7 +31,7 @@ proc drawHistogram*(v: View, g: Group, y = 16) =
       stdDev += d * d
   stdDev = sqrt(stdDev / nTot)
 
-  let bins = 64
+  let bins = w /% 3
   var accum = newSeqOfCap[Value](bins)
   var accumMax = 0.Value
 
@@ -40,20 +39,20 @@ proc drawHistogram*(v: View, g: Group, y = 16) =
     if v.cfg.ts.contains(e.time):
       let t = (e.getVal() - vAvg) / stdDev
       var bin = int(bins.Value * (0.5 + (e.getVal() - vAvg) / (stdDev * 2.0)))
-      bin = bin.clamp(0, bins-1)
-      accum[bin] += 1.0
-      accumMax = max(accum[bin], accumMax)
+      if bin >= 0 and bin <= bins-1:
+        accum[bin] += 1.0
+        accumMax = max(accum[bin], accumMax)
   
-  v.setColor sdl.Color(a: 128)
-  v.drawFillRect(v.w-w, y, v.w-1, h+y)
+  v.setColor colBg
+  v.drawFillRect(0, 0, w-1, h)
   
   v.setColor v.groupColor(g)
-  v.drawRect(v.w-w, y, v.w-1, h+y)
+  v.drawRect(0, 0, w-1, h-1)
 
   for i in 0..<bins:
     let x1 = (w * (i+0) / bins).int
     let x2 = (w * (i+1) / bins).int - 2
     let y1 = h - (h.float * accum[i] / accumMax).int
     let y2 = h.int
-    v.drawFillRect(v.w-w+x1, y1+y, v.w-w+x2, y2+y)
+    v.drawFillRect(x1, y1, x2, y2)
 

@@ -184,9 +184,6 @@ proc draw*(v: View, appStats: AppStats) =
   v.drawGui()
   v.drawStatusbar(appStats)
 
-  if v.curGroup != nil:
-    v.drawHistogram(v.curGroup, v.cfg.rowSize)
-
   v.rend.renderPresent
 
   v.stats.renderTime = cpuTime() - t1

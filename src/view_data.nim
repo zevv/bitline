@@ -20,6 +20,7 @@ import gui
 import misc
 import view_types
 import view_grid
+import histogram
 
 
 proc drawEvents(v:View, g: Group, y: int, h: int) =
@@ -225,6 +226,15 @@ proc drawGroup(v: View, y: int, g: Group, labels: var seq[Label]): int =
     let x1 = v.time2x(v.tMeasure)
     let x2 = v.mouse_x
     labels.add Label(x: x2+2, y: y, text: label, col: col)
+
+  # Draw histogram if row is high enough
+  if g.events.len > 0 and gv.height > 1:
+    let histW = min((gv.height-1) * 64, 256)
+    let histH = min(rowSize - 3, 96)
+    var r = sdl.Rect(x: v.w - histW, y: y+2, w: histW, h: histH)
+    discard v.rend.rendersetViewport(r.addr)
+    v.drawHistogram(g, r.w, r.h)
+    discard v.rend.rendersetViewport(nil)
 
   y += h
 
