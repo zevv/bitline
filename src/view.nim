@@ -23,6 +23,7 @@ import view_api
 import view_grid
 import view_data
 import view_control
+import histogram
 
 
 proc drawCursor(v: View) =
@@ -182,6 +183,9 @@ proc draw*(v: View, appStats: AppStats) =
   v.drawCursor()
   v.drawGui()
   v.drawStatusbar(appStats)
+
+  if v.curGroup != nil:
+    v.drawHistogram(v.curGroup)
 
   v.rend.renderPresent
 
