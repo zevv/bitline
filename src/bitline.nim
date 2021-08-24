@@ -40,8 +40,6 @@ proc updateGroups(app: App, updateViews=false) =
     result = g.ts
   let ts = aux(app.root)
 
-  echo app.stats.eventCount
-
 
 proc pollSdl(app: App): bool =
 

@@ -16,8 +16,6 @@ proc getVal(e: Event): Value =
 
 proc drawHistogram*(v: View, g: Group, w, h: int) =
 
-  echo w, " ", h
-  
   var vTot, nTot: Value
   for e in g.events:
     if v.cfg.ts.contains(e.time):
