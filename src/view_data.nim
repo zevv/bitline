@@ -122,6 +122,9 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
   if graphPoints.len > 0:
     discard v.rend.renderDrawLines(graphPoints[0].addr, graphPoints.len)
+    for i in 0..<graphPoints.len:
+      inc graphPoints[i].y
+    discard v.rend.renderDrawLines(graphPoints[0].addr, graphPoints.len)
 
   if graphRects.len > 0:
     col.a = 96
@@ -268,7 +271,6 @@ proc drawGroup(v: View, y: int, g: Group, labels: var seq[Label]): int =
     v.drawFillRect(0, yGroup, v.w, y-1)
 
   return y
-
 
 
 proc drawData*(v: View) =
