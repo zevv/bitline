@@ -58,60 +58,84 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
   if i1 > 0: dec i1
   if i2 < g.events.len: inc i2
 
-  var
-    kind = g.events[i1].kind
-    i = i1
-    x1Next, x2Next: int
-    valueNext: Value
-    x1Cur = int.low
-    x2Cur = int.low
-    vTot, vMin, vMax, nTot: Value
+  when true:
 
-  proc emit() =
-    var x1 = x1Cur.clamp(-1, v.w)
-    var x2 = x2Cur.clamp(-1, v.w)
-    case kind
-      of ekOneshot:
-        rects.add Rect(x: x1, y: y, w: 1, h: h)
-      of ekSpan:
-        rects.add Rect(x: x1, y: y, w: x2-x1+1, h: h)
-      of ekCounter, ekGauge:
-        graphRects.add Rect(x: x1, y: y, w: x2-x1+1, h: h)
-        graphPoints.add Point(x: x1, y: val2y(vTot / nTot))
-        if nTot > 1:
-          let yMin = vMin.val2Y
-          let yMax = vMax.val2Y
-          graphRects.add Rect(x: x1, y: yMax, w: x2-x1+1, h: yMin-yMax)
+    for x in 0..<v.w:
+      var n = 0
+      for i in i1..<i2:
+        let e = g.events[i]
+        let tx1 = v.x2time(x+1)
+        let tx2 = v.x2time(x+1)
+        let te1 = e.time
+        let te2 = if e.kind == ekSpan: e.time + e.duration else: e.time
+        if tx1 <= te2:
+          if tx2 >= te1:
+            inc n
+            #i1 = i-1
+          else:
+            break
 
-  while i < i2:
+      if n > 0:
+        echo n
+        var d = (log(n.float, 2) * h.float * 0.2).int.clamp(h /% 2, h)
+        rects.add Rect(x: x, y: y, w: 1, h: d)
 
-    # Collect all events on the current x position
+  else:
+
+    var
+      kind = g.events[i1].kind
+      i = i1
+      x1Next, x2Next: int
+      valueNext: Value
+      x1Cur = int.low
+      x2Cur = int.low
+      vTot, vMin, vMax, nTot: Value
+
+    proc emit() =
+      var x1 = x1Cur.clamp(-1, v.w)
+      var x2 = x2Cur.clamp(-1, v.w)
+      case kind
+        of ekOneshot:
+          rects.add Rect(x: x1, y: y, w: 1, h: h)
+        of ekSpan:
+          rects.add Rect(x: x1, y: y, w: x2-x1+1, h: h)
+        of ekCounter, ekGauge:
+          graphRects.add Rect(x: x1, y: y, w: x2-x1+1, h: h)
+          graphPoints.add Point(x: x1, y: val2y(vTot / nTot))
+          if nTot > 1:
+            let yMin = vMin.val2Y
+            let yMax = vMax.val2Y
+            graphRects.add Rect(x: x1, y: yMax, w: x2-x1+1, h: yMin-yMax)
+
     while i < i2:
-      let
-        e = g.events[i]
-        x1 = v.time2x(e.time)
-        x2 = if e.kind == ekSpan: v.time2x(e.time + e.duration) else: x1
-        value = if e.kind in {ekCounter,ekGauge}: e.value else: 0
-      if x2 > x2Cur+1:
-        (x1Next, x2Next, valueNext) = (x1, x2, value)
-        break
-      vTot += value
-      vMin = min(vMin, value)
-      vMax = max(vMax, value)
-      nTot += 1
-      inc i
 
-    if x1Cur != int.low:
-      emit()
+      # Collect all events on the current x position
+      while i < i2:
+        let
+          e = g.events[i]
+          x1 = v.time2x(e.time)
+          x2 = if e.kind == ekSpan: v.time2x(e.time + e.duration) else: x1
+          value = if e.kind in {ekCounter,ekGauge}: e.value else: 0
+        if x2 > x2Cur+1:
+          (x1Next, x2Next, valueNext) = (x1, x2, value)
+          break
+        vTot += value
+        vMin = min(vMin, value)
+        vMax = max(vMax, value)
+        nTot += 1
+        inc i
 
-    x1Cur = x1Next
-    x2Cur = x2Next
-    vTot = valueNext
-    vMin = valueNext
-    vMAx = valueNext
-    nTot = 1
+      if x1Cur != int.low:
+        emit()
 
-  emit()
+      x1Cur = x1Next
+      x2Cur = x2Next
+      vTot = valueNext
+      vMin = valueNext
+      vMAx = valueNext
+      nTot = 1
+
+    emit()
 
 
   var col = v.groupColor(g)
