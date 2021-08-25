@@ -47,7 +47,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
   # graph state
   var
-    rects = newSeqOfCap[Rect](v.w)
+    rects: array[4, seq[Rect]]
     graphRects = newSeqOfCap[Rect](v.w)
     graphPoints = newSeqOfCap[Point](v.w)
 
@@ -60,25 +60,27 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
   when true:
 
-    for x in 0..<v.w:
+    var x = 0
+    while x < v.w:
+      x = max(x, v.time2x(g.events[i1].time))
       var n = 0
       for i in i1..<i2:
         let e = g.events[i]
-        let tx1 = v.x2time(x+1)
+        let tx1 = v.x2time(x+0)
         let tx2 = v.x2time(x+1)
         let te1 = e.time
         let te2 = if e.kind == ekSpan: e.time + e.duration else: e.time
-        if tx1 <= te2:
-          if tx2 >= te1:
+        if te2 >= tx1:
+          if te1 <= tx2:
             inc n
-            #i1 = i-1
+            i1 = i
           else:
             break
 
       if n > 0:
-        echo n
-        var d = (log(n.float, 2) * h.float * 0.2).int.clamp(h /% 2, h)
-        rects.add Rect(x: x, y: y, w: 1, h: d)
+        var d = log(n.float, 2).int.clamp(0, 3)
+        rects[d].add Rect(x: x, y: y+1-d/%2, w: 1, h: h-2+d)
+      inc x
 
   else:
 
@@ -141,8 +143,11 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
   var col = v.groupColor(g)
   v.setColor(col)
 
-  if rects.len > 0:
-    discard v.rend.renderFillRects(rects[0].addr, rects.len)
+  for i in 0..3:
+    col.a = (127 + (3-i)*32).uint8
+    v.setColor(col)
+    if rects[i].len > 0:
+      discard v.rend.renderFillRects(rects[i][0].addr, rects[i].len)
 
   if graphPoints.len > 0:
     discard v.rend.renderDrawLines(graphPoints[0].addr, graphPoints.len)
