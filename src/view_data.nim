@@ -47,7 +47,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
 
   # graph state
   var
-    rects: array[4, seq[Rect]]
+    rects: array[4, seq[FRect]]
     graphRects = newSeqOfCap[Rect](v.w)
     graphPoints = newSeqOfCap[Point](v.w)
 
@@ -78,8 +78,10 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
             break
 
       if n > 0:
-        var d = log(n.float, 2).int.clamp(0, 3)
-        rects[d].add Rect(x: x, y: y+1-d/%2, w: 1, h: h-2+d)
+        var d = (sqrt(n.float) * 0.2).clamp(0, 1)
+        let i = int(d * 4).clamp(0, 3)
+        let dh = (1.0 - d) * h.float * 0.3
+        rects[i].add FRect(x: x.float, y: y.float+dh, w: 1.0, h: h.float-2*dh)
       inc x
 
   else:
@@ -147,7 +149,7 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
     col.a = (127 + (3-i)*32).uint8
     v.setColor(col)
     if rects[i].len > 0:
-      discard v.rend.renderFillRects(rects[i][0].addr, rects[i].len)
+      discard v.rend.renderFillRectsF(rects[i][0].addr, rects[i].len)
 
   if graphPoints.len > 0:
     discard v.rend.renderDrawLines(graphPoints[0].addr, graphPoints.len)
