@@ -189,6 +189,9 @@ proc genMeasure(v: View, group: Group): string =
 
 proc drawGroup(v: View, y: int, g: Group, labels: var seq[Label]): int =
 
+  if y > v.h:
+    return y
+
   var y = y
   let gv = v.groupView(g)
 
