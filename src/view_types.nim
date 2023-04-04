@@ -12,7 +12,7 @@ import json
 import math
 
 import chroma except Color
-import sdl2/sdl except Event
+import sdl2_nim/sdl except Event
 
 import textcache
 import usage
@@ -135,7 +135,7 @@ proc binColor*(v: View, bin: Bin, depth=0): Color =
   let hue = bin.float / 9.0 * 360 + 170
   let luma = float(v.cfg.luma) # + (100 - v.cfg.luma) / (depth+1)
   let col = chroma.ColorPolarLUV(h: hue, c: 150.0, l: luma).color()
-  Color(r: (col.r * 255).uint8, g: (col.g * 255).uint8, b: (col.b * 255).uint8, a: 255.uint8)
+  result = Color(r: (col.r * 255).uint8, g: (col.g * 255).uint8, b: (col.b * 255).uint8, a: 255.uint8)
 
 
 proc groupColor*(v: View, g: Group): Color =

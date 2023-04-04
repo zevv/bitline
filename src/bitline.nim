@@ -6,7 +6,7 @@ import hashes
 import tables
 import parseopt
 
-from sdl2/sdl import nil
+from sdl2_nim/sdl import nil
 
 import misc
 import view_types

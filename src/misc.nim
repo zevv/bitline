@@ -6,7 +6,7 @@ import hashes
 import math
 import sets
 
-import sdl2/sdl except Event
+import sdl2_nim/sdl except Event
 
 type
 

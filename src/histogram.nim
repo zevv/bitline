@@ -2,7 +2,7 @@
 import misc
 import view_types
 import math
-import sdl2/sdl except Event
+import sdl2_nim/sdl except Event
 
 proc getVal(e: Event): Value =
   case e.kind

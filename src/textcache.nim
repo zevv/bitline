@@ -1,6 +1,6 @@
 
-import sdl2/sdl
-import sdl2/sdl_ttf
+import sdl2_nim/sdl
+import sdl2_nim/sdl_ttf
 import tables
     
 type

@@ -12,7 +12,7 @@ import json
 import math
 
 import chroma except Color
-import sdl2/sdl except Event
+import sdl2_nim/sdl except Event
 
 import textcache
 import usage
