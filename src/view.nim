@@ -37,7 +37,7 @@ proc drawCursor(v: View) =
   
   if v.tMeasure == NoTime:
 
-    label = t.fromUnixFloat.utc.format("ddd yyyy-MM-dd HH:mm:ss,fff")
+    label = t.fromUnixFloat.inZone(v.tz).format("ddd yyyy-MM-dd HH:mm:ss,fff")
 
   else:
 
@@ -79,12 +79,11 @@ proc drawStatusbar(v: View, aps: AppStats) =
       vws = v.stats
 
     text =
-      "render: " & siFmt(vws.renderTime, "s") & ", " &
-      "groups: " & siFmt(aps.groupCount) & ", " &
-      "events: " & siFmt(aps.eventCount) & " (" &
-      (if v.cfg.utc: "utc" else: "local") &
-      (if v.cfg.follow: ", follow" else: "") &
-      ")"
+      " render: " & siFmt(vws.renderTime, "s") & "," &
+      " groups: " & siFmt(aps.groupCount) & "," &
+      " events: " & siFmt(aps.eventCount) & "," &
+      " tz: " & (if v.cfg.utc: "utc" else: "local") &
+      (if v.cfg.follow: ", follow" else: "")
 
   let h = v.cfg.rowSize + 3
   let y = v.h - h
