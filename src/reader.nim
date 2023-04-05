@@ -56,12 +56,12 @@ proc addEvent(reader: Reader, t: Time, key: string, ev: char, evdata: string) =
 
   case ev:
     of '+':
-      g.events.add misc.Event(kind: ekSpan, data: evdata, time: t)
+      g.events.add misc.Event(kind: ekSpan, data: evdata, time: t, value: value)
     of '-':
       if g.events.len > 0:
         g.events[^1].duration = t - g.events[^1].time
     of '!':
-      g.events.add misc.Event(kind: ekOneshot, data: evdata, time: t)
+      g.events.add misc.Event(kind: ekOneshot, data: evdata, time: t, value: value)
     of 'c':
       if g.prevTotal == NoValue:
         g.prevTotal = value

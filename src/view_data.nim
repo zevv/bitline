@@ -101,6 +101,9 @@ proc drawEvents(v:View, g: Group, y: int, h: int) =
       nTot += 1
       inc i
 
+      if x1 <= v.mouseX and x2 >= v.mouseX and y <= v.mouseY and y+h >= v.mouseY:
+        v.curEvent = e
+
     if x1Cur != int.low:
       emit()
 
@@ -292,7 +295,7 @@ proc drawData*(v: View) =
     var text = e.data
     if e.value != NoValue:
       text = text & " (" & e.value.siFmt & ")"
-    labels.add Label(x: v.mouseX + 15, y: v.mouseY, text: text, col: colEvent)
+    labels.add Label(x: v.mouseX + 15, y: v.mouseY, text: text, col: v.groupColor(v.curGroup))
 
   # Render all labels on top
 

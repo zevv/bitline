@@ -41,21 +41,16 @@ type
     ekGauge,
 
   Event* {.packed.} = object
-    case kind*: EventKind
-      of ekSpan:
-        duration*: Time
-      of ekCounter, ekGauge:
-        value*: Value
-      of ekOneshot:
-        discard
+    kind*: EventKind
+    duration*: Time
     time*: Time
     data*: string
+    value*: Value
 
   AppStats* = object
     eventCount*: int
     groupCount*: int
 
-echo sizeof(Event)
 
 const
   iso8601format* = "yyyy-MM-dd'T'HH:mm:ss'.'ffffff'Z'"
