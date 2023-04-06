@@ -111,6 +111,10 @@ proc sdlEvent*(v: View, e: sdl.Event) =
           v.cfg.yTop += 50
         of sdl.K_DOWN:
           v.cfg.yTop -= 50
+        of sdl.K_PAGE_UP:
+          v.cfg.yTop += v.h /% 2
+        of sdl.K_PAGE_DOWN:
+          v.cfg.yTop -= v.h /% 2
         of sdl.K_RIGHTBRACKET:
           if v.curGroup != nil:
             let gv = v.groupView(v.curGroup)
@@ -195,9 +199,12 @@ proc sdlEvent*(v: View, e: sdl.Event) =
         v.tMeasure = NoTime
 
     of sdl.MouseWheel:
-      if v.curGroup != nil:
-        let gv = v.groupView(v.curGroup)
-        gv.height = (gv.height + e.wheel.y).clamp(0, 10)
+      if modShift:
+        if v.curGroup != nil:
+          let gv = v.groupView(v.curGroup)
+          gv.height = (gv.height + e.wheel.y).clamp(0, 10)
+      else:
+        v.cfg.yTop += e.wheel.y * 50
 
     of sdl.WindowEvent:
       if e.window.event == sdl.WINDOWEVENT_RESIZED:

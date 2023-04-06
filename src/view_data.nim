@@ -253,8 +253,8 @@ proc drawGroup(v: View, y: int, g: Group, labels: var seq[Label]): int =
         let ts2 = g.events[^1].time
         if ts1 < v.cfg.ts.hi and (ts2 == NoTime or ts2 > v.cfg.ts.lo):
           v.drawEvents(g, y, 1)
-          inc y, 2
           inc n
+        inc y, 2
       if n < rowSize:
         for id, cg in g.groups:
           aux(cg)
